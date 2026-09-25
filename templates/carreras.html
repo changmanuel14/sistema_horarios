@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Carreras</h2>
+<form class="crud-form" onsubmit="return enviarCarrera(event)">
+    <label>Nombre: <input type="text" name="nombre" required></label>
+    <label>Código: <input type="text" name="codigo" required></label>
+    <button type="submit">Guardar</button>
+</form>
+<table class="lista">
+    <tr>
+        <th>ID</th>
+        <th>Código</th>
+        <th>Nombre</th>
+    </tr>
+    {% for c in carreras %}
+    <tr>
+        <td>{{ c.id }}</td>
+        <td>{{ c.codigo }}</td>
+        <td>{{ c.nombre }}</td>
+    </tr>
+    {% endfor %}
+</table>
+<script>
+    async function enviarCarrera(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        await fetch('/carreras', { method: 'POST', body: fd });
+        location.reload();
+    }
+</script>
+{% endblock %}

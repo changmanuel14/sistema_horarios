@@ -1,0 +1,28 @@
+# Entorno virtual de Python
+venv/
+env/
+.venv/
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Base de datos local (si usas SQLite, aunque usas MySQL, es buena práctica)
+*.sqlite3
+*.db
+
+# Variables de entorno y secretos (¡NUNCA subas contraseñas reales!)
+.env
+.env.local
+config_local.py
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de migración de Flask (Opcional, pero recomendado no subirlos si cambian mucho)
+migrations/
+conexion.py

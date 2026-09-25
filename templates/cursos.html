@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Cursos</h2>
+
+<!-- Sección de importación masiva -->
+<div class="importar-container">
+    <h3>📥 Importación Masiva de Cursos</h3>
+    <p>Sube un archivo Excel con los cursos a importar.
+        <a href="/cursos/plantilla" class="btn-plantilla">📄 Descargar plantilla</a>
+    </p>
+
+    <form id="form-importar" enctype="multipart/form-data">
+        <input type="file" name="archivo" id="archivo-excel" accept=".xlsx,.xls" required>
+        <button type="submit" class="btn-importar">Importar Cursos</button>
+    </form>
+
+    <div id="resultado-importacion" class="hidden"></div>
+</div>
+
+<hr>
+
+<!-- Formulario de curso individual -->
+<h3>➕ Agregar Curso Individual</h3>
+<form class="crud-form" onsubmit="return enviarCurso(event)">
+    <label>Nombre del curso:
+        <input type="text" name="nombre" required>
+    </label>
+
+    <label>Carrera:
+        <select name="id_carrera" required>
+            <option value="">-- Selecciona una carrera --</option>
+            {% for c in carreras %}
+            <option value="{{ c.id }}">{{ c.nombre }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>Número de Semestre:
+        <input type="number" name="semestre" required min="1" max="12" placeholder="Ej: 1, 2, 3...">
+    </label>
+
+    <label>Periodos semanales (horas):
+        <input type="number" name="no_periodos" required min="1">
+    </label>
+
+    <label>Duración del bloque (horas):
+        <input type="number" name="duracion_bloque" value="2" min="1">
+    </label>
+
+    <button type="submit">Guardar Curso</button>
+</form>
+
+<!-- Tabla de cursos existentes -->
+<h3>📋 Cursos Registrados ({{ cursos|length }})</h3>
+<table class="lista">
+    <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Carrera</th>
+        <th>Semestre</th>
+        <th>Hrs/sem</th>
+        <th>Duración bloque</th>
+    </tr>
+    {% for c in cursos %}
+    <tr>
+        <td>{{ c.id }}</td>
+        <td>{{ c.nombre }}</td>
+        <td>{{ c.id_carrera }}</td>
+        <td>{{ c.semestre }}</td>
+        <td>{{ c.no_periodos_semanales }}</td>
+        <td>{{ c.duracion_bloque }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<script>
+    async function enviarCurso(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const response = await fetch('/cursos', { method: 'POST', body: fd });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error al guardar el curso.');
+        }
+    }
+
+    // Manejar importación masiva
+    document.getElementById('form-importar').onsubmit = async (e) => {
+        e.preventDefault();
+
+        const archivoInput = document.getElementById('archivo-excel');
+        if (!archivoInput.files.length) {
+            alert('Selecciona un archivo Excel primero');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('archivo', archivoInput.files[0]);
+
+        const resultadoDiv = document.getElementById('resultado-importacion');
+        resultadoDiv.innerHTML = '<p class="cargando">⏳ Procesando archivo...</p>';
+        resultadoDiv.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/cursos/importar', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                resultadoDiv.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                return;
+            }
+
+            // Construir resumen
+            let html = '<div class="resumen-importacion">';
+            html += `<h4>✅ Importación completada</h4>`;
+            html += `<p><strong>Cursos importados:</strong> ${data.total_exitosos}</p>`;
+            html += `<p><strong>Errores encontrados:</strong> ${data.total_errores}</p>`;
+
+            // Mostrar exitosos
+            if (data.exitosos.length > 0) {
+                html += '<div class="exitosos"><h5>Cursos agregados:</h5><ul>';
+                data.exitosos.forEach(c => {
+                    html += `<li>Fila ${c.fila}: <strong>${c.nombre}</strong> (${c.carrera}, Semestre ${c.semestre})</li>`;
+                });
+                html += '</ul></div>';
+            }
+
+            // Mostrar errores
+            if (data.errores.length > 0) {
+                html += '<div class="errores"><h5>⚠️ Filas con errores (no importadas):</h5><ul>';
+                data.errores.forEach(e => {
+                    html += `<li><strong>Fila ${e.fila} - "${e.nombre}":</strong><ul>`;
+                    e.errores.forEach(err => {
+                        html += `<li>${err}</li>`;
+                    });
+                    html += '</ul></li>';
+                });
+                html += '</ul></div>';
+            }
+
+            html += '</div>';
+            resultadoDiv.innerHTML = html;
+
+            // Recargar la página después de 3 segundos si hubo exitosos
+            if (data.total_exitosos > 0) {
+                setTimeout(() => location.reload(), 3000);
+            }
+
+        } catch (err) {
+            resultadoDiv.innerHTML = `<p class="error">❌ Error de conexión: ${err.message}</p>`;
+        }
+    };
+</script>
+{% endblock %}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Horarios Universidad</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <nav>
+        <a href="{{ url_for('index') }}">Inicio</a> |
+        <a href="{{ url_for('carreras') }}">Carreras</a> |
+        <a href="{{ url_for('docentes') }}">Docentes</a> |
+        <a href="{{ url_for('cursos') }}">Cursos</a> |
+        <a href="{{ url_for('secciones') }}">Secciones</a> |
+        <a href="{{ url_for('ciclos') }}">Ciclos</a> |
+        <a href="{{ url_for('reportes') }}"><strong>📊 Reportería</strong></a>
+    </nav>
+    <main>{% block content %}
+        <h2>Bienvenido al Sistema de Horarios</h2>
+        <p>Usa el menú superior para navegar.</p>
+        {% endblock %}
+    </main>
+</body>
+
+</html>

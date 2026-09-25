@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>🔬 Horario de Laboratorio - {{ ciclo.nombre }}</h2>
+
+<div class="reporte-controls">
+    <label>Selecciona un laboratorio:
+        <select id="sel-lab-reporte" onchange="cargarHorario(this.value)">
+            <option value="">-- Seleccionar --</option>
+            <option value="laboratorio_escuela">🔬 Laboratorio Escuela</option>
+            <option value="laboratorio_radiologia">☢️ Laboratorio Radiología</option>
+        </select>
+    </label>
+    <div id="acciones-descarga" class="hidden">
+        <a id="btn-descargar-pdf" class="btn-download btn-pdf" target="_blank">📄 Descargar PDF</a>
+        <a id="btn-descargar-excel" class="btn-download btn-excel" target="_blank">📊 Descargar Excel</a>
+    </div>
+</div>
+
+<div id="horario-reporte"></div>
+
+<script>
+    const cicloId = {{ ciclo.id }};
+    const DIAS_NOMBRE = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const params = new URLSearchParams(window.location.search);
+        const lab = params.get('lab');
+        if (lab) {
+            document.getElementById('sel-lab-reporte').value = lab;
+            cargarHorario(lab);
+        }
+    });
+
+    async function cargarHorario(modalidad) {
+        const contenedor = document.getElementById('horario-reporte');
+        const acciones = document.getElementById('acciones-descarga');
+
+        if (!modalidad) {
+            contenedor.innerHTML = '';
+            acciones.classList.add('hidden');
+            return;
+        }
+
+        const res = await fetch(`/api/reporte/laboratorio/${cicloId}/${modalidad}`);
+        const data = await res.json();
+
+        document.getElementById('btn-descargar-pdf').href = `/descargar/pdf/laboratorio/${cicloId}/${modalidad}`;
+        document.getElementById('btn-descargar-excel').href = `/descargar/excel/laboratorio/${cicloId}/${modalidad}`;
+        acciones.classList.remove('hidden');
+
+        if (data.asignaciones.length === 0) {
+            contenedor.innerHTML = '<p class="vacio">No hay asignaciones registradas en este laboratorio.</p>';
+            return;
+        }
+
+        // Agrupar por día y hora
+        const horasUnicas = [...new Set(data.asignaciones.map(a => a.hora_inicio))].sort();
+
+        let html = `<h3>${data.nombre}</h3>`;
+        html += '<table class="horario-reporte-tabla"><thead><tr><th>Hora</th>';
+        const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+        dias.forEach(d => html += `<th>${d}</th>`);
+        html += '</tr></thead><tbody>';
+
+        const colorBg = modalidad === 'laboratorio_escuela' ? 'bg-lab-escuela' : 'bg-lab-radiologia';
+
+        horasUnicas.forEach(h => {
+            const ref = data.asignaciones.find(a => a.hora_inicio === h);
+            html += `<tr><td class="hora-label">${h} - ${ref.hora_fin}</td>`;
+            for (let d = 1; d <= 7; d++) {
+                const items = data.asignaciones.filter(a => a.dia === d && a.hora_inicio === h);
+                if (items.length > 0) {
+                    const contenido = items.map(it =>
+                        `<strong>${it.curso}</strong><br>${it.carrera} ${it.seccion}<br>${it.docente}`
+                    ).join('<hr>');
+                    html += `<td class="${colorBg}">${contenido}</td>`;
+                } else {
+                    html += '<td></td>';
+                }
+            }
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+
+        contenedor.innerHTML = html;
+    }
+</script>
+{% endblock %}

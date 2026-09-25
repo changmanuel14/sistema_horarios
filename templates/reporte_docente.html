@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>👨‍🏫 Horario por Docente - {{ ciclo.nombre }}</h2>
+
+<div class="reporte-controls">
+    <label>Selecciona un docente:
+        <select id="sel-docente-reporte" onchange="cargarHorario(this.value)">
+            <option value="">-- Seleccionar --</option>
+        </select>
+    </label>
+    <div id="acciones-descarga" class="hidden">
+        <a id="btn-descargar-pdf" class="btn-download btn-pdf" target="_blank">📄 Descargar PDF</a>
+    </div>
+</div>
+
+<div id="horario-reporte"></div>
+
+<script>
+    const cicloId = {{ ciclo.id }};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const res = await fetch('/api/docentes');
+        const docentes = await res.json();
+        const sel = document.getElementById('sel-docente-reporte');
+        sel.innerHTML = '<option value="">-- Seleccionar --</option>' +
+            docentes.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+
+        const params = new URLSearchParams(window.location.search);
+        const docenteId = params.get('docente');
+        if (docenteId) {
+            sel.value = docenteId;
+            cargarHorario(docenteId);
+        }
+    });
+
+    async function cargarHorario(docenteId) {
+        const contenedor = document.getElementById('horario-reporte');
+        const acciones = document.getElementById('acciones-descarga');
+
+        if (!docenteId) {
+            contenedor.innerHTML = '';
+            acciones.classList.add('hidden');
+            return;
+        }
+
+        const res = await fetch(`/api/reporte/docente/${cicloId}/${docenteId}`);
+        const data = await res.json();
+
+        document.getElementById('btn-descargar-pdf').href = `/descargar/pdf/docente/${cicloId}/${docenteId}`;
+        acciones.classList.remove('hidden');
+
+        if (data.asignaciones.length === 0) {
+            contenedor.innerHTML = `<h3>${data.docente}</h3><p class="vacio">Este docente no tiene asignaciones en este ciclo.</p>`;
+            return;
+        }
+
+        const horasUnicas = [...new Set(data.asignaciones.map(a => a.hora_inicio))].sort();
+
+        let html = `<h3>${data.grado} ${data.docente}</h3>`;
+        if (data.correo) html += `<p class="correo-docente">📧 ${data.correo}</p>`;
+
+        html += '<table class="horario-reporte-tabla"><thead><tr><th>Hora</th>';
+        const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+        dias.forEach(d => html += `<th>${d}</th>`);
+        html += '</tr></thead><tbody>';
+
+        horasUnicas.forEach(h => {
+            const ref = data.asignaciones.find(a => a.hora_inicio === h);
+            html += `<tr><td class="hora-label">${h} - ${ref.hora_fin}</td>`;
+            for (let d = 1; d <= 7; d++) {
+                const items = data.asignaciones.filter(a => a.dia === d && a.hora_inicio === h);
+                if (items.length > 0) {
+                    const contenido = items.map(it =>
+                        `<strong>${it.curso}</strong><br>${it.carrera} ${it.seccion}<br><em>${it.modalidad}</em>`
+                    ).join('<hr>');
+                    html += `<td>${contenido}</td>`;
+                } else {
+                    html += '<td></td>';
+                }
+            }
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+
+        contenedor.innerHTML = html;
+    }
+</script>
+{% endblock %}

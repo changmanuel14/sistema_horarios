@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>📊 Reportería</h2>
+
+<div class="reportes-container">
+    <div class="reporte-card">
+        <h3>📅 Horario por Sección</h3>
+        <p>Visualiza el horario de una sección específica y expórtalo en PDF o Excel.</p>
+        <label>Selecciona un ciclo:
+            <select id="ciclo-seccion" onchange="cargarSecciones(this.value)">
+                <option value="">-- Seleccionar --</option>
+                {% for c in ciclos %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div id="secciones-container" class="hidden"></div>
+    </div>
+
+    <div class="reporte-card">
+        <h3>🔬 Horario por Laboratorio</h3>
+        <p>Visualiza el horario consolidado de un laboratorio específico.</p>
+        <label>Selecciona un ciclo:
+            <select id="ciclo-lab" onchange="mostrarLaboratorios(this.value)">
+                <option value="">-- Seleccionar --</option>
+                {% for c in ciclos %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div id="labs-container" class="hidden"></div>
+    </div>
+
+    <div class="reporte-card">
+        <h3>👨‍🏫 Horario por Docente</h3>
+        <p>Visualiza el horario de un docente específico.</p>
+        <label>Selecciona un ciclo:
+            <select id="ciclo-docente" onchange="cargarDocentes(this.value)">
+                <option value="">-- Seleccionar --</option>
+                {% for c in ciclos %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div id="docentes-container" class="hidden"></div>
+    </div>
+
+    <div class="reporte-card full-width">
+        <h3>📚 Reportes Completos del Ciclo</h3>
+        <p>Genera reportes consolidados de todo el ciclo.</p>
+        <label>Selecciona un ciclo:
+            <select id="ciclo-completo">
+                <option value="">-- Seleccionar --</option>
+                {% for c in ciclos %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div id="completos-container" class="hidden">
+            <div class="botones-accion">
+                <a id="btn-pdf-vitrina" class="btn-download btn-pdf" target="_blank">
+                    📄 PDF - Todas las secciones (Vitrina)
+                </a>
+                <a id="btn-pdf-vitrina-presencial" class="btn-download btn-pdf" target="_blank">
+                    📄 PDF - Vitrina Solo Presenciales
+                </a>
+                <a id="btn-excel-admin" class="btn-download btn-excel" target="_blank">
+                    📊 Excel - Todas las secciones (Lista administrativa)
+                </a>
+                <a id="btn-pdf-docentes" class="btn-download btn-pdf" target="_blank">
+                    📄 PDF - Horarios de todos los docentes
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function cargarSecciones(cicloId) {
+        const container = document.getElementById('secciones-container');
+        if (!cicloId) { container.classList.add('hidden'); return; }
+
+        const res = await fetch(`/api/horario/secciones/${cicloId}`);
+        const secciones = await res.json();
+
+        if (secciones.length === 0) {
+            container.innerHTML = '<p>No hay secciones activas en este ciclo.</p>';
+        } else {
+            container.innerHTML = secciones.map(s => `
+      <div class="item-reporte">
+        <span>${s.carrera} - Sem ${s.semestre} - Sec ${s.seccion}</span>
+        <div class="acciones">
+          <a href="/reportes/seccion/${cicloId}?seccion=${s.seccion_id}" class="btn-ver">Ver</a>
+          <a href="/descargar/pdf/seccion/${cicloId}/${s.seccion_id}" class="btn-download btn-pdf" target="_blank">PDF</a>
+          <a href="/descargar/excel/seccion/${cicloId}/${s.seccion_id}" class="btn-download btn-excel" target="_blank">Excel</a>
+        </div>
+      </div>
+    `).join('');
+        }
+        container.classList.remove('hidden');
+    }
+
+    function mostrarLaboratorios(cicloId) {
+        const container = document.getElementById('labs-container');
+        if (!cicloId) { container.classList.add('hidden'); return; }
+
+        container.innerHTML = `
+    <div class="item-reporte">
+      <span>🔬 Laboratorio Escuela</span>
+      <div class="acciones">
+        <a href="/reportes/laboratorio/${cicloId}?lab=laboratorio_escuela" class="btn-ver">Ver</a>
+        <a href="/descargar/pdf/laboratorio/${cicloId}/laboratorio_escuela" class="btn-download btn-pdf" target="_blank">PDF</a>
+        <a href="/descargar/excel/laboratorio/${cicloId}/laboratorio_escuela" class="btn-download btn-excel" target="_blank">Excel</a>
+      </div>
+    </div>
+    <div class="item-reporte">
+      <span>☢️ Laboratorio Radiología</span>
+      <div class="acciones">
+        <a href="/reportes/laboratorio/${cicloId}?lab=laboratorio_radiologia" class="btn-ver">Ver</a>
+        <a href="/descargar/pdf/laboratorio/${cicloId}/laboratorio_radiologia" class="btn-download btn-pdf" target="_blank">PDF</a>
+        <a href="/descargar/excel/laboratorio/${cicloId}/laboratorio_radiologia" class="btn-download btn-excel" target="_blank">Excel</a>
+      </div>
+    </div>
+  `;
+        container.classList.remove('hidden');
+    }
+
+    async function cargarDocentes(cicloId) {
+        const container = document.getElementById('docentes-container');
+        if (!cicloId) { container.classList.add('hidden'); return; }
+
+        const res = await fetch('/api/docentes');
+        const docentes = await res.json();
+
+        container.innerHTML = docentes.map(d => `
+    <div class="item-reporte">
+      <span>${d.nombre}</span>
+      <div class="acciones">
+        <a href="/reportes/docente/${cicloId}?docente=${d.id}" class="btn-ver">Ver</a>
+        <a href="/descargar/pdf/docente/${cicloId}/${d.id}" class="btn-download btn-pdf" target="_blank">PDF</a>
+      </div>
+    </div>
+  `).join('');
+        container.classList.remove('hidden');
+    }
+
+    document.getElementById('ciclo-completo').onchange = function () {
+        const cicloId = this.value;
+        const container = document.getElementById('completos-container');
+        if (!cicloId) { container.classList.add('hidden'); return; }
+
+        document.getElementById('btn-pdf-vitrina').href = `/descargar/pdf/todas-secciones/${cicloId}`;
+        document.getElementById('btn-pdf-vitrina-presencial').href = `/descargar/pdf/vitrina-presencial/${cicloId}`;
+        document.getElementById('btn-excel-admin').href = `/descargar/excel/todas-secciones/${cicloId}`;
+        document.getElementById('btn-pdf-docentes').href = `/descargar/pdf/todos-docentes/${cicloId}`;
+        container.classList.remove('hidden');
+    };
+</script>
+{% endblock %}

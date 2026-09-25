@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Docentes</h2>
+
+<form class="crud-form" onsubmit="return enviarDocente(event)">
+    <label>Grado académico: <input type="text" name="grado_academico"></label>
+    <label>Nombres: <input type="text" name="nombres" required></label>
+    <label>Apellidos: <input type="text" name="apellidos" required></label>
+    <label>Teléfono: <input type="text" name="telefono"></label>
+    <label>Correo: <input type="email" name="correo"></label>
+    <button type="submit">Guardar</button>
+</form>
+
+<table class="lista">
+    <tr>
+        <th>ID</th>
+        <th>Grado</th>
+        <th>Nombre completo</th>
+        <th>Correo</th>
+        <th>Acciones</th>
+    </tr>
+    {% for d in docentes %}
+    <tr>
+        <td>{{ d.id }}</td>
+        <td>{{ d.grado_academico or '—' }}</td>
+        <td>{{ d.nombre_completo }}</td>
+        <td>{{ d.correo or '—' }}</td>
+        <td>
+            <button class="btn-restricciones" onclick="abrirRestricciones({{ d.id }}, '{{ d.nombre_completo }}')">
+                ⚙️ Restricciones
+            </button>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<!-- Modal de restricciones -->
+<div id="modal-restricciones" class="modal hidden">
+    <div class="modal-content modal-ancho">
+        <h3>Restricciones de horario: <span id="nombre-docente-restricciones"></span></h3>
+
+        <div id="lista-restricciones"></div>
+
+        <div class="config-group">
+            <h4>Agregar nueva restricción</h4>
+            <label>Día:
+                <select id="restriccion-dia">
+                    <option value="1">Lunes</option>
+                    <option value="2">Martes</option>
+                    <option value="3">Miércoles</option>
+                    <option value="4">Jueves</option>
+                    <option value="5">Viernes</option>
+                    <option value="6">Sábado</option>
+                    <option value="7">Domingo</option>
+                </select>
+            </label>
+            <label>Hora inicio: <select id="restriccion-inicio"></select></label>
+            <label>Hora fin: <select id="restriccion-fin"></select></label>
+            <label>Motivo (opcional): <input type="text" id="restriccion-motivo"
+                    placeholder="Ej: Trabajo, Clase, etc."></label>
+            <button id="btn-agregar-restriccion" class="btn-primary">Agregar</button>
+        </div>
+
+        <div class="modal-actions">
+            <button id="btn-cerrar-restricciones">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let docenteActual = null;
+    const DIAS_NOMBRE = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+    async function enviarDocente(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const response = await fetch('/docentes', { method: 'POST', body: fd });
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error al guardar el docente.');
+        }
+    }
+
+    async function abrirRestricciones(docenteId, nombreDocente) {
+        docenteActual = docenteId;
+        document.getElementById('nombre-docente-restricciones').textContent = nombreDocente;
+        document.getElementById('modal-restricciones').classList.remove('hidden');
+
+        // Llenar selects de horas
+        llenarSelectsHoras();
+
+        // Cargar restricciones existentes
+        await cargarRestricciones();
+    }
+
+    function llenarSelectsHoras() {
+        const selInicio = document.getElementById('restriccion-inicio');
+        const selFin = document.getElementById('restriccion-fin');
+        selInicio.innerHTML = '';
+        selFin.innerHTML = '';
+
+        for (let h = 6; h <= 22; h++) {
+            for (let m = 0; m < 60; m += 15) {
+                const horaStr = String(h).padStart(2, '0');
+                const minStr = String(m).padStart(2, '0');
+                const valor = `${horaStr}:${minStr}`;
+                selInicio.innerHTML += `<option value="${valor}">${valor}</option>`;
+                selFin.innerHTML += `<option value="${valor}">${valor}</option>`;
+            }
+        }
+        selInicio.value = '08:00';
+        selFin.value = '10:00';
+    }
+
+    async function cargarRestricciones() {
+        const res = await fetch(`/api/docente/${docenteActual}/restricciones`);
+        const restricciones = await res.json();
+
+        const lista = document.getElementById('lista-restricciones');
+        if (restricciones.length === 0) {
+            lista.innerHTML = '<p style="color: #7f8c8d;">No hay restricciones configuradas.</p>';
+            return;
+        }
+
+        // Ordenar por día y hora
+        restricciones.sort((a, b) => {
+            if (a.dia !== b.dia) return a.dia - b.dia;
+            return a.hora_inicio.localeCompare(b.hora_inicio);
+        });
+
+        lista.innerHTML = restricciones.map(r => `
+    <div class="restriccion-item">
+      <span class="restriccion-info">
+        <strong>${DIAS_NOMBRE[r.dia]}</strong> ${r.hora_inicio} - ${r.hora_fin}
+        ${r.motivo ? `<em>(${r.motivo})</em>` : ''}
+      </span>
+      <button class="btn-eliminar-restriccion" onclick="eliminarRestriccion(${r.id})">×</button>
+    </div>
+  `).join('');
+    }
+
+    async function eliminarRestriccion(restriccionId) {
+        if (!confirm('¿Eliminar esta restricción?')) return;
+
+        await fetch(`/api/docente/${docenteActual}/restricciones/${restriccionId}`, {
+            method: 'DELETE'
+        });
+        cargarRestricciones();
+    }
+
+    document.getElementById('btn-agregar-restriccion').onclick = async () => {
+        const dia = parseInt(document.getElementById('restriccion-dia').value);
+        const horaInicio = document.getElementById('restriccion-inicio').value;
+        const horaFin = document.getElementById('restriccion-fin').value;
+        const motivo = document.getElementById('restriccion-motivo').value;
+
+        if (horaInicio >= horaFin) {
+            alert('La hora de inicio debe ser menor a la hora de fin');
+            return;
+        }
+
+        await fetch(`/api/docente/${docenteActual}/restricciones`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                dia,
+                hora_inicio: horaInicio,
+                hora_fin: horaFin,
+                motivo
+            })
+        });
+
+        document.getElementById('restriccion-motivo').value = '';
+        cargarRestricciones();
+    };
+
+    document.getElementById('btn-cerrar-restricciones').onclick = () => {
+        document.getElementById('modal-restricciones').classList.add('hidden');
+    };
+</script>
+{% endblock %}

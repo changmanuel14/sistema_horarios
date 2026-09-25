@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Horario — Ciclo {{ ciclo.nombre }}</h2>
+
+<div id="panel-superior">
+    <div class="panel-row">
+        <label class="label-grande">Sección activa:
+            <select id="sel-seccion" class="select-grande">
+                <option value="">-- Seleccionar sección --</option>
+            </select>
+        </label>
+    </div>
+
+    <div id="panel-seccion-activa" class="hidden">
+        <div class="panel-row">
+            <label>Curso a agregar:
+                <select id="sel-curso">
+                    <option value="">-- Seleccionar curso --</option>
+                </select>
+            </label>
+            <button id="btn-agregar-curso">+ Agregar al horario</button>
+            <button id="btn-configurar-grilla" class="btn-secondary">⚙️ Configurar grilla</button>
+            <button id="btn-agregar-receso" class="btn-secondary">☕ Agregar receso</button>
+        </div>
+    </div>
+
+    <div class="panel-row">
+        <button id="btn-activar-carreras">Activar carreras del ciclo</button>
+    </div>
+</div>
+
+<!-- Modal: Configurar grilla de bloques de clase -->
+<div id="config-bloques" class="modal hidden">
+    <div class="modal-content modal-ancho">
+        <h3>Configurar grilla para: <span id="nombre-seccion-config" class="text-highlight"></span></h3>
+
+        <div class="config-group">
+            <label>Hora inicio: <select id="cfg-inicio"></select></label>
+            <label>Hora fin: <select id="cfg-fin"></select></label>
+            <label>Duración del bloque (min):
+                <select id="cfg-duracion">
+                    <option value="60">60</option>
+                    <option value="90" selected>90</option>
+                    <option value="120">120</option>
+                    <option value="custom">Personalizado</option>
+                </select>
+            </label>
+            <input type="number" id="cfg-duracion-custom" class="hidden" placeholder="Minutos" min="30" max="240">
+        </div>
+
+        <div class="config-group">
+            <label>Días:
+                <input type="checkbox" value="1" checked>L
+                <input type="checkbox" value="2" checked>M
+                <input type="checkbox" value="3" checked>M
+                <input type="checkbox" value="4" checked>J
+                <input type="checkbox" value="5" checked>V
+                <input type="checkbox" value="6">S
+                <input type="checkbox" value="7">D
+            </label>
+        </div>
+
+        <div class="config-group recesos-config">
+            <h5>☕ Recesos (opcionales)</h5>
+            <div id="lista-recesos"></div>
+            <button type="button" id="btn-agregar-receso-form" class="btn-secondary">+ Agregar receso</button>
+        </div>
+
+        <div class="config-actions">
+            <button id="btn-confirmar-bloques" class="btn-primary">Generar Grilla</button>
+            <button id="btn-cancelar-bloques">Cancelar</button>
+        </div>
+    </div>
+</div>
+<div class="leyenda">
+    <div class="leyenda-item">
+        <div class="leyenda-color presencial"></div>
+        <span>Presencial</span>
+    </div>
+    <div class="leyenda-item">
+        <div class="leyenda-color virtual"></div>
+        <span>Virtual</span>
+    </div>
+    <div class="leyenda-item">
+        <div class="leyenda-color lab-escuela"></div>
+        <span>Laboratorio Escuela</span>
+    </div>
+    <div class="leyenda-item">
+        <div class="leyenda-color lab-radiologia"></div>
+        <span>Laboratorio Radiología</span>
+    </div>
+</div>
+
+<!-- Tabla de horario -->
+<table id="horario">
+    <thead>
+        <tr>
+            <th>Hora</th>
+            <th>Lunes</th>
+            <th>Martes</th>
+            <th>Miércoles</th>
+            <th>Jueves</th>
+            <th>Viernes</th>
+            <th>Sábado</th>
+            <th>Domingo</th>
+        </tr>
+    </thead>
+    <tbody id="horario-body"></tbody>
+</table>
+
+<!-- Modal: Asignar docente -->
+<div id="modal-docente" class="modal hidden">
+    <div class="modal-content">
+        <h3>Asignar docente</h3>
+        <p id="info-curso" class="info-curso"></p>
+        <label>Docente:
+            <select id="sel-docente"></select>
+        </label>
+        <label>Modalidad:
+            <select id="sel-modalidad">
+                <option value="presencial">Presencial</option>
+                <option value="virtual">Virtual</option>
+                <option value="laboratorio_escuela">Laboratorio Escuela</option>
+                <option value="laboratorio_radiologia">Laboratorio Radiología</option>
+            </select>
+        </label>
+        <div class="modal-actions">
+            <button id="btn-confirmar-docente" class="btn-primary">Confirmar</button>
+            <button id="btn-cancelar-docente">Cancelar</button>
+            <button id="btn-eliminar-modal" class="btn-danger">Eliminar periodo</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const cicloId = {{ ciclo.id }};
+</script>
+<script src="{{ url_for('static', filename='horario.js') }}"></script>
+{% endblock %}

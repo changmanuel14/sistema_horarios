@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Secciones</h2>
+
+<form class="crud-form" onsubmit="return enviarSeccion(event)">
+    <label>Carrera:
+        <select name="id_carrera" required>
+            <option value="">-- Selecciona una carrera --</option>
+            {% for c in carreras %}
+            <option value="{{ c.id }}">{{ c.nombre }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>Número de Semestre:
+        <input type="number" name="semestre" required min="1" max="12" placeholder="Ej: 1, 2, 3...">
+    </label>
+
+    <label>Nombre de la Sección:
+        <input type="text" name="nombre" required placeholder="Ej: A, B, 1, 2" maxlength="10">
+    </label>
+
+    <button type="submit">Guardar Sección</button>
+</form>
+
+<table class="lista">
+    <tr>
+        <th>ID</th>
+        <th>Carrera</th>
+        <th>Semestre</th>
+        <th>Sección</th>
+    </tr>
+    {% for sec, car in secciones %}
+    <tr>
+        <td>{{ sec.id }}</td>
+        <td>{{ car.nombre }}</td>
+        <td>{{ sec.semestre }}</td>
+        <td>{{ sec.nombre }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<script>
+    async function enviarSeccion(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const response = await fetch('/secciones', { method: 'POST', body: fd });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error al guardar la sección.');
+        }
+    }
+</script>
+{% endblock %}
