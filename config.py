@@ -9,9 +9,15 @@ class Config:
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
-        # Neon a veces usa postgres://, lo estandarizamos a postgresql://
+        # 1. Neon a veces usa postgres://, lo estandarizamos a postgresql://
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        # 2. FORZAR el uso de psycopg2 (que es lo que tenemos en requirements.txt)
+        # SQLAlchemy 2.x por defecto busca 'psycopg' (v3) si solo dice 'postgresql://'
+        if database_url.startswith('postgresql://') and 'psycopg2' not in database_url:
+            database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+            
         SQLALCHEMY_DATABASE_URI = database_url
     else:
         # Desarrollo local (MySQL)
