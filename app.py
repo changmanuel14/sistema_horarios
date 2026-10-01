@@ -714,7 +714,7 @@ def cursos_seccion(seccion_id):
     # 3. Nombre del curso (alfabético)
     cursos = db.session.query(Curso)\
         .join(Carrera, Curso.id_carrera == Carrera.id)\
-        .filter(Curso.id_carrera == seccion.id_carrera)\
+        .filter(Curso.id_carrera == seccion.id_carrera,Curso.semestre == seccion.semestre)\
         .order_by(Carrera.nombre, Curso.semestre, Curso.nombre)\
         .all()
     
