@@ -1,9 +1,5 @@
 import os
 from dotenv import load_dotenv
-# Importamos quote_plus para manejar caracteres especiales en la contraseña
-from urllib.parse import quote_plus
-# Importamos las credenciales desde nuestro archivo
-from conexion import Conhost, Conuser, Conpassword, Condb
 
 load_dotenv()
 
@@ -21,6 +17,6 @@ class Config:
         SQLALCHEMY_DATABASE_URI = database_url
     else:
         # Desarrollo local (MySQL)
-        SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{quote_plus(Conuser)}:{quote_plus(Conpassword)}@{Conhost}/{Condb}'
+        SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:database@localhost/horarios_universidad'
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
