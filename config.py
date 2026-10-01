@@ -9,15 +9,14 @@ class Config:
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
-        # Convertir postgres:// a postgresql:// (Neon a veces usa postgres://)
+        # Neon a veces usa postgres://, lo estandarizamos a postgresql://
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        # Forzar el uso de psycopg2 en lugar de psycopg3
-        # Cambia postgresql:// por postgresql+psycopg2://
-        if database_url.startswith('postgresql://'):
-            database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
-        
+        # Asegurarnos de que no esté forzado a psycopg2
+        if 'psycopg2' in database_url:
+            database_url = database_url.replace('postgresql+psycopg2://', 'postgresql://', 1)
+            
         SQLALCHEMY_DATABASE_URI = database_url
     else:
         # Desarrollo local (MySQL)
