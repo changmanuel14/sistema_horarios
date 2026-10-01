@@ -1299,8 +1299,8 @@ def descargar_pdf_todos_docentes(ciclo_id):
     filename = f"horarios_docentes_{ciclo.nombre}.pdf"
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
-with app.app_context():
-    db.create_all()
+#with app.app_context():
+#    db.create_all()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5008, threaded=True, debug=True)

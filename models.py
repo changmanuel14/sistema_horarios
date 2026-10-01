@@ -72,7 +72,7 @@ class BloqueHorario(db.Model):
     dia = db.Column(db.Integer, nullable=False)          # 1=Lun ... 7=Dom
     hora_inicio = db.Column(db.Time, nullable=False)
     hora_fin = db.Column(db.Time, nullable=False)
-    tipo = db.Column(db.Enum('clase', 'receso'), default='clase', nullable=False)
+    tipo = db.Column(db.Enum('clase', 'receso', name='tipo_bloque_enum'), default='clase', nullable=False)
 
 class RestriccionDocente(db.Model):
     __tablename__ = 'restriccion_docente'
@@ -94,9 +94,8 @@ class Asignacion(db.Model):
     id_docente = db.Column(db.Integer, db.ForeignKey('docente.id'))
     id_bloque = db.Column(db.Integer, db.ForeignKey('bloque_horario.id'), nullable=False)
     modalidad = db.Column(
-        db.Enum('presencial', 'virtual', 'laboratorio_escuela', 'laboratorio_radiologia'),
-        default='presencial'
-    )
+    db.Enum('presencial', 'virtual', 'laboratorio_escuela', 'laboratorio_radiologia', name='modalidad_enum'), 
+    default='presencial')
 
     seccion = db.relationship('Seccion')
     curso = db.relationship('Curso')
