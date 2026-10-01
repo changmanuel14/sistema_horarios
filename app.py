@@ -706,15 +706,20 @@ def secciones_activas(ciclo_id):
 
 @app.route('/api/horario/cursos/<int:seccion_id>')
 def cursos_seccion(seccion_id):
-    """Obtiene los cursos que coinciden con la carrera y semestre de la sección."""
-    sec = Seccion.query.get_or_404(seccion_id)
-    cursos = Curso.query.filter_by(
-        id_carrera=sec.id_carrera,
-        semestre=sec.semestre
-    ).all()
-
+    seccion = Seccion.query.get_or_404(seccion_id)
+    
+    # Obtener cursos de la carrera de esta sección, ordenados por:
+    # 1. Nombre de carrera (aunque sea la misma, por consistencia)
+    # 2. Semestre (numérico)
+    # 3. Nombre del curso (alfabético)
+    cursos = db.session.query(Curso)\
+        .join(Carrera, Curso.id_carrera == Carrera.id)\
+        .filter(Curso.id_carrera == seccion.id_carrera)\
+        .order_by(Carrera.nombre, Curso.semestre, Curso.nombre)\
+        .all()
+    
     return jsonify([{
-        'id': c.id,
+        'id': c.id, 
         'nombre': c.nombre,
         'periodos': c.no_periodos_semanales
     } for c in cursos])
