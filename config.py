@@ -9,16 +9,18 @@ class Config:
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
-        # Normalizar el prefijo de la URL
+        # Convertir postgres:// a postgresql:// (Neon a veces usa postgres://)
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        # Asegurar que use el driver psycopg (v3) explícitamente
-        if database_url.startswith('postgresql://') and '+psycopg' not in database_url:
-            database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+        # Forzar el uso de psycopg2 en lugar de psycopg3
+        # Cambia postgresql:// por postgresql+psycopg2://
+        if database_url.startswith('postgresql://'):
+            database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
         
         SQLALCHEMY_DATABASE_URI = database_url
     else:
+        # Desarrollo local (MySQL)
         SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:database@localhost/horarios_universidad'
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
