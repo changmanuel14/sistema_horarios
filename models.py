@@ -23,6 +23,8 @@ class Curso(db.Model):
     semestre = db.Column(db.Integer, nullable=False)  # Número de semestre (1, 2, 3...)
     no_periodos_semanales = db.Column(db.Integer, nullable=False)
     duracion_bloque = db.Column(db.Integer, default=2)
+    
+    carrera = db.relationship('Carrera')
 
 
 class Docente(db.Model):
