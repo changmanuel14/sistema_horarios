@@ -71,19 +71,27 @@ def secciones():
 def cursos():
     if request.method == 'POST':
         d = request.form
-        curso = Curso(
+        nuevo_curso = Curso(
             nombre=d['nombre'],
             id_carrera=int(d['id_carrera']),
             semestre=int(d['semestre']),
             no_periodos_semanales=int(d['no_periodos']),
-            duracion_bloque=int(d.get('duracion_bloque', 2))
+            duracion_bloque=int(d['duracion_bloque'])
         )
-        db.session.add(curso)
+        db.session.add(nuevo_curso)
         db.session.commit()
         return jsonify({'ok': True})
-
+    
+    # 1. Obtener carreras para el desplegable (ordenadas alfabéticamente)
     carreras_list = Carrera.query.order_by(Carrera.nombre).all()
-    return render_template('cursos.html', cursos=Curso.query.all(), carreras=carreras_list)
+    
+    # 2. Obtener cursos ordenados por: Carrera (nombre) -> Semestre (número) -> Curso (nombre)
+    cursos_list = db.session.query(Curso)\
+        .join(Carrera, Curso.id_carrera == Carrera.id)\
+        .order_by(Carrera.codigo, Curso.semestre, Curso.nombre)\
+        .all()
+    
+    return render_template('cursos.html', cursos=cursos_list, carreras=carreras_list)
 
 
 @app.route('/cursos/importar', methods=['POST'])
