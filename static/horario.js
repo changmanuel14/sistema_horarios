@@ -451,6 +451,18 @@ async function cargarDocentes() {
     const sel = document.getElementById('sel-docente');
     sel.innerHTML = '<option value="">— Sin asignar —</option>' +
         ds.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+
+    // Inicializar Select2 con buscador
+    $(sel).select2({
+        placeholder: 'Buscar docente...',
+        allowClear: true,
+        width: '100%',
+        language: {
+            noResults: () => 'No se encontraron docentes',
+            searching: () => 'Buscando...',
+            inputTooShort: () => 'Escribe para buscar'
+        }
+    });
 }
 
 async function cargarCursos(seccionId) {
