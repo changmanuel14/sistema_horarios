@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>📚 Horarios por Carrera - {{ ciclo.nombre }}</h2>
+
+<div class="reporte-controls">
+    <label>Selecciona una carrera:
+        <select id="sel-carrera-reporte" onchange="cargarSecciones(this.value)">
+            <option value="">-- Seleccionar --</option>
+        </select>
+    </label>
+    <div id="acciones-descarga" class="hidden">
+        <a id="btn-descargar-pdf" class="btn-download btn-pdf" target="_blank">📄 Descargar PDF</a>
+        <a id="btn-descargar-excel" class="btn-download btn-excel" target="_blank">📊 Descargar Excel</a>
+    </div>
+</div>
+
+<div id="contenido-reporte"></div>
+
+<script>
+    const cicloId = {{ ciclo.id }};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const res = await fetch(`/api/reporte/carreras/${cicloId}`);
+        const carreras = await res.json();
+        const sel = document.getElementById('sel-carrera-reporte');
+        sel.innerHTML = '<option value="">-- Seleccionar --</option>' +
+            carreras.map(c => `<option value="${c.id}">${c.nombre} (${c.codigo})</option>`).join('');
+
+        // Si viene por URL, cargar automáticamente
+        const params = new URLSearchParams(window.location.search);
+        const carreraId = params.get('carrera');
+        if (carreraId) {
+            sel.value = carreraId;
+            cargarSecciones(carreraId);
+        }
+    });
+
+    async function cargarSecciones(carreraId) {
+        const contenedor = document.getElementById('contenido-reporte');
+        const acciones = document.getElementById('acciones-descarga');
+
+        if (!carreraId) {
+            contenedor.innerHTML = '';
+            acciones.classList.add('hidden');
+            return;
+        }
+
+        // Configurar botones de descarga
+        document.getElementById('btn-descargar-pdf').href = `/descargar/pdf/carrera/${cicloId}/${carreraId}`;
+        document.getElementById('btn-descargar-excel').href = `/descargar/excel/carrera/${cicloId}/${carreraId}`;
+        acciones.classList.remove('hidden');
+
+        // Obtener secciones de la carrera
+        const resSec = await fetch(`/api/horario/secciones/${cicloId}`);
+        const todasSecciones = await resSec.json();
+        const seccionesCarrera = todasSecciones.filter(s => s.carrera_id == carreraId);
+
+        if (seccionesCarrera.length === 0) {
+            contenedor.innerHTML = '<p class="vacio">No hay secciones registradas para esta carrera en este ciclo.</p>';
+            return;
+        }
+
+        let html = '';
+
+        // Cargar horario de cada sección
+        for (const sec of seccionesCarrera) {
+            const resHor = await fetch(`/api/reporte/seccion/${cicloId}/${sec.seccion_id}`);
+            const data = await resHor.json();
+
+            html += `<div class="seccion-bloque">`;
+            html += `<h3>Semestre ${sec.semestre} - Sección ${sec.seccion}</h3>`;
+
+            if (data.asignaciones.length === 0) {
+                html += '<p class="vacio">Esta sección no tiene horarios asignados.</p>';
+                html += '</div>';
+                continue;
+            }
+
+            const horasUnicas = [...new Set(data.bloques.filter(b => b.tipo === 'clase').map(b => b.hora_inicio))].sort();
+
+            html += '<table class="horario-reporte-tabla"><thead><tr><th>Hora</th>';
+            const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+            dias.forEach(d => html += `<th>${d}</th>`);
+            html += '</tr></thead><tbody>';
+
+            horasUnicas.forEach(h => {
+                const bloqueRef = data.bloques.find(b => b.hora_inicio === h);
+                html += `<tr><td class="hora-label">${h} - ${bloqueRef.hora_fin}</td>`;
+                for (let d = 1; d <= 7; d++) {
+                    const asignacion = data.asignaciones.find(a => a.dia === d && a.hora_inicio === h);
+                    if (asignacion) {
+                        const claseColor = {
+                            'Presencial': 'bg-presencial',
+                            'Virtual': 'bg-virtual',
+                            'Lab. Escuela': 'bg-lab-escuela',
+                            'Lab. Radiología': 'bg-lab-radiologia'
+                        }[asignacion.modalidad] || '';
+                        html += `<td class="${claseColor}"><strong>${asignacion.curso}</strong><br>${asignacion.docente}<br><em>${asignacion.modalidad}</em></td>`;
+                    } else {
+                        html += '<td></td>';
+                    }
+                }
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            html += '</div>';
+        }
+
+        contenedor.innerHTML = html;
+    }
+</script>
+{% endblock %}

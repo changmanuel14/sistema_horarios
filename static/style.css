@@ -1023,3 +1023,19 @@ table.lista th {
 .errores li {
     margin: 3px 0;
 }
+
+/* Separador entre secciones en reporte por carrera */
+.seccion-bloque {
+    margin-bottom: 30px;
+    padding: 15px;
+    background: #fafafa;
+    border-left: 4px solid #3498db;
+    border-radius: 4px;
+}
+
+.seccion-bloque h3 {
+    margin-top: 0;
+    color: #2c3e50;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+}

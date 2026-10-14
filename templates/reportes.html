@@ -45,6 +45,20 @@
         <div id="docentes-container" class="hidden"></div>
     </div>
 
+    <div class="reporte-card">
+        <h3>📚 Horario por Carrera</h3>
+        <p>Visualiza y exporta los horarios de todas las secciones de una carrera específica.</p>
+        <label>Selecciona un ciclo:
+            <select id="ciclo-carrera" onchange="cargarCarreras(this.value)">
+                <option value="">-- Seleccionar --</option>
+                {% for c in ciclos %}
+                <option value="{{ c.id }}">{{ c.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div id="carreras-container" class="hidden"></div>
+    </div>
+
     <div class="reporte-card full-width">
         <h3>📚 Reportes Completos del Ciclo</h3>
         <p>Genera reportes consolidados de todo el ciclo.</p>

@@ -6,7 +6,7 @@ from config import Config
 from datetime import datetime, time
 from reportes import (generar_pdf_seccion, generar_pdf_laboratorio, generar_pdf_todas_secciones,
                     generar_excel_todas_secciones, generar_excel_laboratorio, generar_pdf_docente, generar_pdf_todos_docentes, 
-                    generar_pdf_vitrina_presencial)
+                    generar_pdf_vitrina_presencial, generar_pdf_carrera, generar_excel_carrera)
 from flask import send_file
 from openpyxl import load_workbook
 from werkzeug.utils import secure_filename
@@ -1311,6 +1311,55 @@ def descargar_pdf_todos_docentes(ciclo_id):
     pdf = generar_pdf_todos_docentes(ciclo)
     filename = f"horarios_docentes_{ciclo.nombre}.pdf"
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
+
+# ============================================================
+# Reportería: Vista por carrera
+# ============================================================
+@app.route('/reportes/carrera/<int:ciclo_id>')
+def reporte_carrera(ciclo_id):
+    """Vista de horarios por carrera."""
+    ciclo = Ciclo.query.get_or_404(ciclo_id)
+    return render_template('reporte_carrera.html', ciclo=ciclo)
+
+
+# ============================================================
+# Reportería: API para obtener carreras activas en un ciclo
+# ============================================================
+@app.route('/api/reporte/carreras/<int:ciclo_id>')
+def api_reporte_carreras(ciclo_id):
+    """Devuelve las carreras activas en un ciclo."""
+    carreras = db.session.query(Carrera).join(
+        CicloCarrera, Carrera.id == CicloCarrera.id_carrera
+    ).filter(CicloCarrera.id_ciclo == ciclo_id).order_by(Carrera.nombre).all()
+    
+    return jsonify([{
+        'id': c.id,
+        'nombre': c.nombre,
+        'codigo': c.codigo
+    } for c in carreras])
+
+
+# ============================================================
+# Reportería: Descargas por carrera
+# ============================================================
+@app.route('/descargar/pdf/carrera/<int:ciclo_id>/<int:carrera_id>')
+def descargar_pdf_carrera(ciclo_id, carrera_id):
+    ciclo = Ciclo.query.get_or_404(ciclo_id)
+    carrera = Carrera.query.get_or_404(carrera_id)
+    pdf = generar_pdf_carrera(ciclo, carrera)
+    filename = f"horarios_{carrera.codigo or carrera.nombre}_{ciclo.nombre}.pdf".replace(' ', '_')
+    return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
+
+
+@app.route('/descargar/excel/carrera/<int:ciclo_id>/<int:carrera_id>')
+def descargar_excel_carrera(ciclo_id, carrera_id):
+    ciclo = Ciclo.query.get_or_404(ciclo_id)
+    carrera = Carrera.query.get_or_404(carrera_id)
+    excel = generar_excel_carrera(ciclo, carrera)
+    filename = f"horarios_{carrera.codigo or carrera.nombre}_{ciclo.nombre}.xlsx".replace(' ', '_')
+    return send_file(excel,
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    as_attachment=True, download_name=filename)
 
 with app.app_context():
     db.create_all()

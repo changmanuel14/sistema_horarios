@@ -604,3 +604,27 @@ function configurarBotones() {
         }
     };
 }
+
+async function cargarCarreras(cicloId) {
+    const container = document.getElementById('carreras-container');
+    if (!cicloId) { container.classList.add('hidden'); return; }
+
+    const res = await fetch(`/api/reporte/carreras/${cicloId}`);
+    const carreras = await res.json();
+
+    if (carreras.length === 0) {
+        container.innerHTML = '<p>No hay carreras activas en este ciclo.</p>';
+    } else {
+        container.innerHTML = carreras.map(c => `
+      <div class="item-reporte">
+        <span>${c.nombre} (${c.codigo})</span>
+        <div class="acciones">
+          <a href="/reportes/carrera/${cicloId}?carrera=${c.id}" class="btn-ver">Ver</a>
+          <a href="/descargar/pdf/carrera/${cicloId}/${c.id}" class="btn-download btn-pdf" target="_blank">PDF</a>
+          <a href="/descargar/excel/carrera/${cicloId}/${c.id}" class="btn-download btn-excel" target="_blank">Excel</a>
+        </div>
+      </div>
+    `).join('');
+    }
+    container.classList.remove('hidden');
+}

@@ -991,3 +991,212 @@ def generar_pdf_vitrina_presencial(ciclo):
     doc.build(elementos)
     buffer.seek(0)
     return buffer
+
+# ============================================================
+# PDF: Horario de una carrera (todas sus secciones)
+# ============================================================
+def generar_pdf_carrera(ciclo, carrera):
+    """Genera PDF con todas las secciones de una carrera específica."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter),
+                            leftMargin=0.5*inch, rightMargin=0.5*inch,
+                            topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    styles = getSampleStyleSheet()
+    titulo_style = ParagraphStyle('Titulo', parent=styles['Heading1'],
+                                   fontSize=18, alignment=1, spaceAfter=15)
+    subtitulo_style = ParagraphStyle('Subtitulo', parent=styles['Heading2'],
+                                      fontSize=12, alignment=1, spaceAfter=15)
+    
+    elementos = []
+    
+    # Logos al inicio
+    elementos.append(construir_encabezado_logos())
+    elementos.append(Spacer(1, 10))
+    
+    elementos.append(Paragraph(f"Horarios - {carrera.nombre}", titulo_style))
+    elementos.append(Paragraph(
+        f"Ciclo: {ciclo.nombre} | Del {ciclo.fecha_inicio.strftime('%d/%m/%Y')} al {ciclo.fecha_fin.strftime('%d/%m/%Y')}",
+        subtitulo_style
+    ))
+    elementos.append(Spacer(1, 20))
+    
+    # Obtener todas las secciones de esta carrera
+    secciones = Seccion.query.filter_by(id_carrera=carrera.id).order_by(
+        Seccion.semestre, Seccion.nombre
+    ).all()
+    
+    if not secciones:
+        elementos.append(Paragraph(
+            "No hay secciones registradas para esta carrera.",
+            styles['Normal']
+        ))
+        doc.build(elementos)
+        buffer.seek(0)
+        return buffer
+    
+    primera_pagina = True
+    secciones_incluidas = 0
+    
+    for seccion in secciones:
+        datos = obtener_datos_horario_seccion(ciclo.id, seccion.id)
+        if not datos['asignaciones'] and not datos['bloques']:
+            continue
+        
+        secciones_incluidas += 1
+        
+        if not primera_pagina:
+            elementos.append(PageBreak())
+        primera_pagina = False
+        
+        grilla, horas = construir_grilla(datos['bloques'], datos['asignaciones'])
+        
+        # Encabezado de sección
+        sec_style = ParagraphStyle('Sec', parent=styles['Heading2'],
+                                    fontSize=14, textColor=colors.HexColor('#2C3E50'),
+                                    spaceAfter=10)
+        elementos.append(Paragraph(
+            f"Semestre {seccion.semestre} - Sección {seccion.nombre}",
+            sec_style
+        ))
+        
+        # Tabla
+        header = ['Hora'] + [DIAS_CORTO[d] for d in range(1, 8)]
+        tabla_data = [header]
+        
+        for h in horas:
+            bloque_ref = next((b for b in datos['bloques'] if b.hora_inicio == h), None)
+            fila = [f"{h.strftime('%H:%M')}-{bloque_ref.hora_fin.strftime('%H:%M')}" if bloque_ref else h.strftime('%H:%M')]
+            
+            for d in range(1, 8):
+                celda = grilla[h].get(d)
+                if celda:
+                    texto = f"<b>{celda['curso']}</b><br/>{celda['docente']}<br/><i>{MODALIDAD_NOMBRE.get(celda['modalidad'], celda['modalidad'])}</i>"
+                    fila.append(Paragraph(texto, styles['Normal']))
+                else:
+                    fila.append('')
+            tabla_data.append(fila)
+        
+        tabla = Table(tabla_data, colWidths=[1.1*inch] + [1.3*inch]*7)
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2C3E50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (0, -1), colors.HexColor('#ECF0F1')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ])
+        
+        for i, h in enumerate(horas, start=1):
+            for d in range(1, 8):
+                celda = grilla[h].get(d)
+                if celda:
+                    color = MODALIDAD_COLOR.get(celda['modalidad'], '#FFFFFF')
+                    style.add('BACKGROUND', (d, i), (d, i), colors.HexColor(color))
+        
+        tabla.setStyle(style)
+        elementos.append(tabla)
+    
+    if secciones_incluidas == 0:
+        elementos.append(Paragraph(
+            "No hay secciones con horarios asignados en este ciclo.",
+            styles['Normal']
+        ))
+    
+    doc.build(elementos)
+    buffer.seek(0)
+    return buffer
+
+
+# ============================================================
+# Excel: Horario de una carrera (todas sus secciones)
+# ============================================================
+def generar_excel_carrera(ciclo, carrera):
+    """Genera Excel con todas las secciones de una carrera específica en formato lista."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = carrera.codigo or carrera.nombre[:20]
+    
+    # Insertar logos
+    insertar_logos_excel(ws)
+    
+    # Estilos
+    header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    
+    # Encabezado
+    ws.merge_cells('A3:I3')
+    ws['A3'] = f"Horarios - {carrera.nombre}"
+    ws['A3'].font = Font(size=14, bold=True)
+    ws['A3'].alignment = Alignment(horizontal='center')
+    
+    ws.merge_cells('A4:I4')
+    ws['A4'] = f"Ciclo: {ciclo.nombre} | Del {ciclo.fecha_inicio.strftime('%d/%m/%Y')} al {ciclo.fecha_fin.strftime('%d/%m/%Y')}"
+    ws['A4'].alignment = Alignment(horizontal='center')
+    
+    # Encabezados de columna
+    headers = ['Semestre', 'Sección', 'Día', 'Hora Inicio', 'Hora Fin',
+               'Curso', 'Docente', 'Modalidad']
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=6, column=col, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+        cell.alignment = Alignment(horizontal='center')
+    
+    # Obtener secciones ordenadas
+    secciones = Seccion.query.filter_by(id_carrera=carrera.id).order_by(
+        Seccion.semestre, Seccion.nombre
+    ).all()
+    
+    row = 7
+    for seccion in secciones:
+        asignaciones = Asignacion.query.filter_by(
+            id_ciclo=ciclo.id, id_seccion=seccion.id
+        ).all()
+        
+        # Ordenar por día y hora
+        asignaciones_sorted = sorted(asignaciones, 
+                                     key=lambda a: (a.bloque.dia, a.bloque.hora_inicio))
+        
+        for a in asignaciones_sorted:
+            ws.cell(row=row, column=1, value=seccion.semestre).border = border
+            ws.cell(row=row, column=2, value=seccion.nombre).border = border
+            ws.cell(row=row, column=3, value=DIAS_NOMBRE[a.bloque.dia]).border = border
+            ws.cell(row=row, column=4, value=a.bloque.hora_inicio.strftime('%H:%M')).border = border
+            ws.cell(row=row, column=5, value=a.bloque.hora_fin.strftime('%H:%M')).border = border
+            ws.cell(row=row, column=6, value=a.curso.nombre).border = border
+            
+            # Formato: Grado + Nombre + Apellido
+            if a.docente:
+                docente_nombre = a.docente.nombre_con_grado
+            else:
+                docente_nombre = '—'
+            ws.cell(row=row, column=7, value=docente_nombre).border = border
+            
+            ws.cell(row=row, column=8, 
+                   value=MODALIDAD_NOMBRE.get(a.modalidad, a.modalidad)).border = border
+            row += 1
+    
+    # Ajustar anchos
+    ws.column_dimensions['A'].width = 10
+    ws.column_dimensions['B'].width = 10
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 12
+    ws.column_dimensions['E'].width = 12
+    ws.column_dimensions['F'].width = 25
+    ws.column_dimensions['G'].width = 30
+    ws.column_dimensions['H'].width = 18
+    
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
