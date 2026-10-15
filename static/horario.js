@@ -370,13 +370,38 @@ async function validarLaboratorio(modalidad, bloqueId, asignacionId) {
 function abrirModalDocente(a) {
     asignacionEditando = a;
     document.getElementById('modal-docente').classList.remove('hidden');
-    document.getElementById('sel-docente').value = a.docente_id || '';
+
+    // IMPORTANTE: Destruir Select2 anterior antes de cambiar valores
+    $('#sel-docente').select2('destroy');
+
+    // Establecer el valor correcto del docente
+    const selDocente = document.getElementById('sel-docente');
+    selDocente.value = a.docente_id || '';
+
+    // Establecer modalidad
     document.getElementById('sel-modalidad').value = a.modalidad;
+
+    // Info del curso
     document.getElementById('info-curso').textContent =
         `${a.curso} — ${a.dia ? DIAS_NOMBRE[a.dia] : ''} ${a.hora_inicio}-${a.hora_fin}`;
+
+    // Reinicializar Select2 con el valor correcto
+    $(selDocente).select2({
+        placeholder: 'Buscar docente...',
+        allowClear: true,
+        width: '100%',
+        dropdownParent: $('#modal-docente'),  // ← IMPORTANTE: evita problemas con modales
+        language: {
+            noResults: () => 'No se encontraron docentes',
+            searching: () => 'Buscando...',
+            inputTooShort: () => 'Escribe para buscar'
+        }
+    });
 }
 
 document.getElementById('btn-cancelar-docente').onclick = () => {
+    // Destruir Select2 antes de cerrar el modal
+    $('#sel-docente').select2('destroy');
     document.getElementById('modal-docente').classList.add('hidden');
 };
 
@@ -389,14 +414,19 @@ document.getElementById('btn-confirmar-docente').onclick = async () => {
         const okDocente = await validarTraslape(
             docenteId, asignacionEditando.bloque_id, asignacionEditando.id
         );
-        if (!okDocente) return;
+        if (!okDocente) {
+            // Si hay traslape, NO cerrar el modal
+            return;
+        }
     }
 
     // 2. Validar traslape de laboratorio (si es un laboratorio)
     const okLab = await validarLaboratorio(
         modalidad, asignacionEditando.bloque_id, asignacionEditando.id
     );
-    if (!okLab) return;
+    if (!okLab) {
+        return;
+    }
 
     // 3. Actualizar la asignación base
     await fetch(`/api/asignacion/${asignacionEditando.id}`, {
@@ -430,6 +460,8 @@ document.getElementById('btn-confirmar-docente').onclick = async () => {
         }
     }
 
+    // 5. Destruir Select2 antes de cerrar
+    $('#sel-docente').select2('destroy');
     document.getElementById('modal-docente').classList.add('hidden');
     cargarAsignaciones();
 };
@@ -451,18 +483,6 @@ async function cargarDocentes() {
     const sel = document.getElementById('sel-docente');
     sel.innerHTML = '<option value="">— Sin asignar —</option>' +
         ds.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
-
-    // Inicializar Select2 con buscador
-    $(sel).select2({
-        placeholder: 'Buscar docente...',
-        allowClear: true,
-        width: '100%',
-        language: {
-            noResults: () => 'No se encontraron docentes',
-            searching: () => 'Buscando...',
-            inputTooShort: () => 'Escribe para buscar'
-        }
-    });
 }
 
 async function cargarCursos(seccionId) {
