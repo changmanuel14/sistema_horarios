@@ -5,8 +5,8 @@ from flask_migrate import Migrate
 from config import Config
 from datetime import datetime, time
 from reportes import (generar_pdf_seccion, generar_pdf_laboratorio, generar_pdf_todas_secciones,
-                    generar_excel_todas_secciones, generar_excel_laboratorio, generar_pdf_docente, generar_pdf_todos_docentes, 
-                    generar_pdf_vitrina_presencial, generar_pdf_carrera, generar_excel_carrera)
+                      generar_excel_todas_secciones, generar_excel_laboratorio, generar_pdf_docente, generar_pdf_todos_docentes,
+                      generar_pdf_vitrina_presencial, generar_pdf_carrera, generar_excel_carrera)
 from flask import send_file
 from openpyxl import load_workbook
 from werkzeug.utils import secure_filename
@@ -18,9 +18,30 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 
+def obtener_ciclos_superpuestos(ciclo_id):
+    """
+    Obtiene los IDs de todos los ciclos que se superponen temporalmente con el ciclo dado.
+    Dos ciclos se superponen si: cicloA.inicio < cicloB.fin AND cicloB.inicio < cicloA.fin
+    """
+    ciclo_actual = Ciclo.query.get(ciclo_id)
+    if not ciclo_actual:
+        return [ciclo_id]
+
+    # Buscar todos los ciclos que se superponen con el ciclo actual
+    ciclos_superpuestos = Ciclo.query.filter(
+        Ciclo.id != ciclo_id,  # Excluir el ciclo actual
+        Ciclo.fecha_inicio < ciclo_actual.fecha_fin,
+        Ciclo.fecha_fin > ciclo_actual.fecha_inicio
+    ).all()
+
+    # Retornar lista de IDs incluyendo el ciclo actual
+    return [ciclo_actual.id] + [c.id for c in ciclos_superpuestos]
+
 # ============================================================
 # Rutas de navegación principal
 # ============================================================
+
+
 @app.route('/')
 def index():
     return render_template('base.html')
@@ -81,16 +102,16 @@ def cursos():
         db.session.add(nuevo_curso)
         db.session.commit()
         return jsonify({'ok': True})
-    
+
     # 1. Obtener carreras para el desplegable (ordenadas alfabéticamente)
     carreras_list = Carrera.query.order_by(Carrera.nombre).all()
-    
+
     # 2. Obtener cursos ordenados por: Carrera (nombre) -> Semestre (número) -> Curso (nombre)
     cursos_list = db.session.query(Curso)\
         .join(Carrera, Curso.id_carrera == Carrera.id)\
         .order_by(Carrera.codigo, Curso.semestre, Curso.nombre)\
         .all()
-    
+
     return render_template('cursos.html', cursos=cursos_list, carreras=carreras_list)
 
 
@@ -316,11 +337,13 @@ def descargar_plantilla_cursos():
 # CRUD: Docentes
 # ============================================================
 
+
 def vacio_a_none(valor):
-            if valor is None:
-                return None
-            valor = str(valor).strip()
-            return valor if valor else None
+    if valor is None:
+        return None
+    valor = str(valor).strip()
+    return valor if valor else None
+
 
 @app.route('/docentes', methods=['GET', 'POST'])
 def docentes():
@@ -338,7 +361,7 @@ def docentes():
         db.session.add(docente)
         db.session.commit()
         return jsonify({'ok': True})
-    return render_template('docentes.html', docentes=Docente.query.order_by(Docente.grado_academico,Docente.nombres,Docente.apellidos).all())
+    return render_template('docentes.html', docentes=Docente.query.order_by(Docente.grado_academico, Docente.nombres, Docente.apellidos).all())
 
 
 # ============================================================
@@ -608,7 +631,8 @@ def listar_carreras():
 
 @app.route('/api/docentes')
 def listar_docentes():
-    docentes = Docente.query.order_by(Docente.grado_academico,Docente.nombres,Docente.apellidos).all()
+    docentes = Docente.query.order_by(
+        Docente.grado_academico, Docente.nombres, Docente.apellidos).all()
     return jsonify([{'id': d.id, 'nombre': d.nombre_con_grado} for d in docentes])
 
 
@@ -707,19 +731,19 @@ def secciones_activas(ciclo_id):
 @app.route('/api/horario/cursos/<int:seccion_id>')
 def cursos_seccion(seccion_id):
     seccion = Seccion.query.get_or_404(seccion_id)
-    
+
     # Obtener cursos de la carrera de esta sección, ordenados por:
     # 1. Nombre de carrera (aunque sea la misma, por consistencia)
     # 2. Semestre (numérico)
     # 3. Nombre del curso (alfabético)
     cursos = db.session.query(Curso)\
         .join(Carrera, Curso.id_carrera == Carrera.id)\
-        .filter(Curso.id_carrera == seccion.id_carrera,Curso.semestre == seccion.semestre)\
+        .filter(Curso.id_carrera == seccion.id_carrera, Curso.semestre == seccion.semestre)\
         .order_by(Carrera.nombre, Curso.semestre, Curso.nombre)\
         .all()
-    
+
     return jsonify([{
-        'id': c.id, 
+        'id': c.id,
         'nombre': c.nombre,
         'periodos': c.no_periodos_semanales
     } for c in cursos])
@@ -730,7 +754,7 @@ def cursos_seccion(seccion_id):
 # ============================================================
 @app.route('/api/validar_traslape', methods=['POST'])
 def validar_traslape():
-    """Detecta traslapes por intervalos de tiempo y restricciones del docente."""
+    """Detecta traslapes por intervalos de tiempo, restricciones y ciclos superpuestos."""
     d = request.json
     docente_id = d.get('docente_id')
     bloque_id = d.get('bloque_id')
@@ -761,7 +785,6 @@ def validar_traslape():
         r_inicio_min = restriccion.hora_inicio.hour * 60 + restriccion.hora_inicio.minute
         r_fin_min = restriccion.hora_fin.hour * 60 + restriccion.hora_fin.minute
 
-        # Verificar traslape con la restricción
         if target_inicio_min < r_fin_min and r_inicio_min < target_fin_min:
             motivo = f" ({restriccion.motivo})" if restriccion.motivo else ""
             return jsonify({
@@ -773,11 +796,18 @@ def validar_traslape():
             })
 
     # ---------------------------------------------------------
-    # 2. Verificar traslape con otras asignaciones del docente
+    # 2. Obtener ciclos superpuestos
+    # ---------------------------------------------------------
+    ciclos_ids = obtener_ciclos_superpuestos(ciclo_id)
+
+    # ---------------------------------------------------------
+    # 3. Verificar traslape con otras asignaciones del docente
+    #    en TODOS los ciclos superpuestos
     # ---------------------------------------------------------
     asignaciones_docente = db.session.query(Asignacion).join(BloqueHorario).filter(
         Asignacion.id_docente == docente_id,
-        Asignacion.id_ciclo == ciclo_id,
+        # ← Buscar en todos los ciclos superpuestos
+        Asignacion.id_ciclo.in_(ciclos_ids),
         BloqueHorario.dia == bloque_target.dia
     )
 
@@ -795,6 +825,8 @@ def validar_traslape():
         if target_inicio_min < existente_fin_min and existente_inicio_min < target_fin_min:
             sec_conflicto = Seccion.query.get(asignacion.id_seccion)
             nombre_seccion = f"{sec_conflicto.nombre}" if sec_conflicto else "otra sección"
+            ciclo_conflicto = Ciclo.query.get(asignacion.id_ciclo)
+            nombre_ciclo = ciclo_conflicto.nombre if ciclo_conflicto else "otro ciclo"
 
             traslape_inicio = max(target_inicio_min, existente_inicio_min)
             traslape_fin = min(target_fin_min, existente_fin_min)
@@ -803,7 +835,7 @@ def validar_traslape():
             return jsonify({
                 'conflicto': True,
                 'mensaje': f"El docente ya tiene asignada la clase '{asignacion.curso.nombre}' "
-                f"en la Sección {nombre_seccion} "
+                f"en la Sección {nombre_seccion} del ciclo {nombre_ciclo} "
                 f"({bloque_existente.hora_inicio.strftime('%H:%M')}-"
                 f"{bloque_existente.hora_fin.strftime('%H:%M')}). "
                 f"Traslape de {minutos_traslape} minutos."
@@ -819,12 +851,11 @@ DIAS_NOMBRE = ['', 'Lunes', 'Martes', 'Miércoles',
 
 @app.route('/api/validar_laboratorio', methods=['POST'])
 def validar_laboratorio():
-    """Verifica si ya existe otra asignación con el mismo laboratorio en el mismo día y hora."""
+    """Verifica si ya existe otra asignación con el mismo laboratorio en ciclos superpuestos."""
     d = request.json
     modalidad = d.get('modalidad')
     bloque_id = int(d.get('bloque_id')) if d.get('bloque_id') else None
-    asignacion_id = int(d.get('asignacion_id')) if d.get(
-        'asignacion_id') else None
+    asignacion_id = int(d.get('asignacion_id')) if d.get('asignacion_id') else None
     ciclo_id = int(d.get('ciclo_id')) if d.get('ciclo_id') else None
 
     if modalidad not in ['laboratorio_escuela', 'laboratorio_radiologia']:
@@ -846,17 +877,21 @@ def validar_laboratorio():
     obj_inicio_min = hora_inicio_objetivo.hour * 60 + hora_inicio_objetivo.minute
     obj_fin_min = hora_fin_objetivo.hour * 60 + hora_fin_objetivo.minute
 
-    # Buscar TODAS las asignaciones del ciclo con la misma modalidad de laboratorio
-    # que tengan un bloque el mismo día con horario que se traslape
+    # ---------------------------------------------------------
+    # Obtener ciclos superpuestos
+    # ---------------------------------------------------------
+    ciclos_ids = obtener_ciclos_superpuestos(ciclo_id)
+
+    # Buscar TODAS las asignaciones de TODOS los ciclos superpuestos
+    # con la misma modalidad de laboratorio que tengan un bloque el mismo día
     asignaciones_lab = db.session.query(Asignacion).join(BloqueHorario).filter(
-        Asignacion.id_ciclo == ciclo_id,
+        Asignacion.id_ciclo.in_(ciclos_ids),  # ← Buscar en todos los ciclos superpuestos
         Asignacion.modalidad == modalidad,
         BloqueHorario.dia == dia_objetivo
     )
 
     if asignacion_id:
-        asignaciones_lab = asignaciones_lab.filter(
-            Asignacion.id != asignacion_id)
+        asignaciones_lab = asignaciones_lab.filter(Asignacion.id != asignacion_id)
 
     # Verificar traslape por intervalos de tiempo
     for asignacion in asignaciones_lab.all():
@@ -864,20 +899,20 @@ def validar_laboratorio():
         b_inicio_min = b.hora_inicio.hour * 60 + b.hora_inicio.minute
         b_fin_min = b.hora_fin.hour * 60 + b.hora_fin.minute
 
-        # Dos intervalos se traslapan si: A_inicio < B_fin Y B_inicio < A_fin
         if obj_inicio_min < b_fin_min and b_inicio_min < obj_fin_min:
             sec_conflicto = Seccion.query.get(asignacion.id_seccion)
             nombre_seccion = sec_conflicto.nombre if sec_conflicto else "otra sección"
-            carrera = Carrera.query.get(
-                sec_conflicto.id_carrera) if sec_conflicto else None
+            carrera = Carrera.query.get(sec_conflicto.id_carrera) if sec_conflicto else None
             nombre_carrera = carrera.nombre if carrera else ""
+            ciclo_conflicto = Ciclo.query.get(asignacion.id_ciclo)
+            nombre_ciclo = ciclo_conflicto.nombre if ciclo_conflicto else "otro ciclo"
 
             nombre_lab = "Laboratorio Escuela" if modalidad == 'laboratorio_escuela' else "Laboratorio Radiología"
 
             return jsonify({
                 'conflicto': True,
                 'mensaje': f"El {nombre_lab} ya está ocupado en ese horario por el curso '{asignacion.curso.nombre}' "
-                f"de la Sección {nombre_seccion} ({nombre_carrera})."
+                          f"de la Sección {nombre_seccion} ({nombre_carrera}) del ciclo {nombre_ciclo}."
             })
 
     return jsonify({'conflicto': False})
@@ -937,23 +972,29 @@ def propagar_docente(id):
     # Obtener IDs de las asignaciones del curso para excluir de la búsqueda de conflictos
     ids_asignaciones_curso = [a.id for a in asignaciones_curso]
     
+    # ---------------------------------------------------------
+    # Obtener ciclos superpuestos
+    # ---------------------------------------------------------
+    ciclos_ids = obtener_ciclos_superpuestos(asignacion_base.id_ciclo)
+    
     conflictos = []
     for asignacion in asignaciones_curso:
         if asignacion.id == id:
-            continue  # La base ya se validó antes
+            continue
         
-        # ← NUEVO: Si ya tiene el mismo docente, no hay nada que hacer
+        # Si ya tiene el mismo docente, no hay nada que hacer
         if asignacion.id_docente == docente_id:
             continue
         
         bloque_objetivo = asignacion.bloque
         
         # Buscar conflictos EXCLUYENDO las asignaciones del mismo curso
+        # y buscando en TODOS los ciclos superpuestos
         conflicto = db.session.query(Asignacion).join(BloqueHorario).filter(
             Asignacion.id_docente == docente_id,
-            Asignacion.id_ciclo == asignacion_base.id_ciclo,
+            Asignacion.id_ciclo.in_(ciclos_ids),  # ← Buscar en todos los ciclos superpuestos
             BloqueHorario.dia == bloque_objetivo.dia,
-            Asignacion.id.notin_(ids_asignaciones_curso)  # ← EXCLUIR asignaciones del mismo curso
+            Asignacion.id.notin_(ids_asignaciones_curso)
         ).first()
         
         if conflicto:
@@ -964,15 +1005,19 @@ def propagar_docente(id):
             obj_fin = bloque_objetivo.hora_fin.hour * 60 + bloque_objetivo.hora_fin.minute
             
             if obj_inicio < conf_fin and conf_inicio < obj_fin:
+                ciclo_conflicto = Ciclo.query.get(conflicto.id_ciclo)
+                nombre_ciclo = ciclo_conflicto.nombre if ciclo_conflicto else "otro ciclo"
+                
                 conflictos.append({
                     'bloque': f"{DIAS_NOMBRE[bloque_objetivo.dia]} {bloque_objetivo.hora_inicio.strftime('%H:%M')}-{bloque_objetivo.hora_fin.strftime('%H:%M')}",
-                    'curso_conflicto': conflicto.curso.nombre
+                    'curso_conflicto': conflicto.curso.nombre,
+                    'ciclo_conflicto': nombre_ciclo
                 })
     
     if conflictos:
         mensaje = "No se puede propagar el docente por los siguientes traslapes:\n"
         for c in conflictos:
-            mensaje += f"  • En {c['bloque']}, el docente ya imparte '{c['curso_conflicto']}'\n"
+            mensaje += f"  • En {c['bloque']} del ciclo {c['ciclo_conflicto']}, el docente ya imparte '{c['curso_conflicto']}'\n"
         return jsonify({'error': mensaje}), 400
     
     # Propagar el docente solo a las asignaciones que no lo tienen
@@ -989,12 +1034,6 @@ def propagar_docente(id):
         'actualizadas': actualizadas,
         'total': len(asignaciones_curso)
     })
-
-
-# Constante para los nombres de días (necesaria en el endpoint anterior)
-DIAS_NOMBRE = ['', 'Lunes', 'Martes', 'Miércoles',
-               'Jueves', 'Viernes', 'Sábado', 'Domingo']
-
 
 @app.route('/api/asignacion/<int:id>', methods=['DELETE'])
 def eliminar_asignacion(id):
@@ -1033,6 +1072,8 @@ def horario_datos_seccion(ciclo_id, seccion_id):
 # ============================================================
 # Reportería: Vistas
 # ============================================================
+
+
 @app.route('/reportes')
 def reportes():
     """Página principal de reportería."""
@@ -1068,18 +1109,18 @@ def reporte_docente(ciclo_id):
 def api_reporte_seccion(ciclo_id, seccion_id):
     """Devuelve los datos del horario de una sección."""
     from reportes import obtener_datos_horario_seccion, DIAS_NOMBRE, MODALIDAD_NOMBRE
-    
+
     datos = obtener_datos_horario_seccion(ciclo_id, seccion_id)
     seccion = Seccion.query.get_or_404(seccion_id)
     carrera = Carrera.query.get(seccion.id_carrera)
-    
+
     bloques = [{
         'id': b.id, 'dia': b.dia,
         'hora_inicio': b.hora_inicio.strftime('%H:%M'),
         'hora_fin': b.hora_fin.strftime('%H:%M'),
         'tipo': b.tipo
     } for b in datos['bloques']]
-    
+
     asignaciones = [{
         'id': a.id, 'bloque_id': a.id_bloque,
         'dia': a.bloque.dia,
@@ -1089,7 +1130,7 @@ def api_reporte_seccion(ciclo_id, seccion_id):
         'docente': a.docente.nombre_con_grado if a.docente else '—',
         'modalidad': MODALIDAD_NOMBRE.get(a.modalidad, a.modalidad)
     } for a in datos['asignaciones']]
-    
+
     return jsonify({
         'seccion': f"{carrera.nombre} - Semestre {seccion.semestre} - Sección {seccion.nombre}",
         'bloques': bloques,
@@ -1101,14 +1142,14 @@ def api_reporte_seccion(ciclo_id, seccion_id):
 def api_reporte_laboratorio(ciclo_id, modalidad):
     """Devuelve los datos del horario de un laboratorio."""
     from reportes import MODALIDAD_NOMBRE
-    
+
     if modalidad not in ['laboratorio_escuela', 'laboratorio_radiologia']:
         return jsonify({'error': 'Modalidad inválida'}), 400
-    
+
     asignaciones = Asignacion.query.filter_by(
         id_ciclo=ciclo_id, modalidad=modalidad
     ).all()
-    
+
     resultado = []
     for a in asignaciones:
         sec = a.seccion
@@ -1123,7 +1164,7 @@ def api_reporte_laboratorio(ciclo_id, modalidad):
             'carrera': carrera.nombre if carrera else '',
             'seccion': f"Sem {sec.semestre}-{sec.nombre}"
         })
-    
+
     return jsonify({
         'nombre': MODALIDAD_NOMBRE.get(modalidad, modalidad),
         'asignaciones': resultado
@@ -1134,12 +1175,12 @@ def api_reporte_laboratorio(ciclo_id, modalidad):
 def api_reporte_docente(ciclo_id, docente_id):
     """Devuelve los datos del horario de un docente."""
     from reportes import MODALIDAD_NOMBRE
-    
+
     docente = Docente.query.get_or_404(docente_id)
     asignaciones = Asignacion.query.filter_by(
         id_ciclo=ciclo_id, id_docente=docente_id
     ).all()
-    
+
     resultado = []
     for a in asignaciones:
         sec = a.seccion
@@ -1154,7 +1195,7 @@ def api_reporte_docente(ciclo_id, docente_id):
             'seccion': f"Sem {sec.semestre}-{sec.nombre}",
             'modalidad': MODALIDAD_NOMBRE.get(a.modalidad, a.modalidad)
         })
-    
+
     return jsonify({
         'docente': docente.nombre_con_grado,
         'grado': docente.grado_academico or '',
@@ -1171,7 +1212,7 @@ def descargar_pdf_seccion(ciclo_id, seccion_id):
     ciclo = Ciclo.query.get_or_404(ciclo_id)
     seccion = Seccion.query.get_or_404(seccion_id)
     carrera = Carrera.query.get(seccion.id_carrera)
-    
+
     pdf = generar_pdf_seccion(ciclo, seccion, carrera)
     filename = f"horario_{carrera.codigo}_{seccion.semestre}_{seccion.nombre}_{ciclo.nombre}.pdf"
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
@@ -1184,69 +1225,76 @@ def descargar_excel_seccion(ciclo_id, seccion_id):
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
     from io import BytesIO
     from reportes import MODALIDAD_NOMBRE
-    
+
     ciclo = Ciclo.query.get_or_404(ciclo_id)
     seccion = Seccion.query.get_or_404(seccion_id)
     carrera = Carrera.query.get(seccion.id_carrera)
-    
+
     wb = Workbook()
     ws = wb.active
     ws.title = f"Sem{seccion.semestre}-{seccion.nombre}"
-    
-    header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+
+    header_fill = PatternFill(start_color="2C3E50",
+                              end_color="2C3E50", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True, size=11)
     border = Border(
         left=Side(style='thin'), right=Side(style='thin'),
         top=Side(style='thin'), bottom=Side(style='thin')
     )
-    
+
     ws.merge_cells('A1:I1')
     ws['A1'] = f"{carrera.nombre} - Semestre {seccion.semestre} - Sección {seccion.nombre}"
     ws['A1'].font = Font(size=14, bold=True)
     ws['A1'].alignment = Alignment(horizontal='center')
-    
+
     ws.merge_cells('A2:I2')
     ws['A2'] = f"Ciclo: {ciclo.nombre}"
     ws['A2'].alignment = Alignment(horizontal='center')
-    
-    headers = ['Día', 'Hora Inicio', 'Hora Fin', 'Curso', 'Docente', 'Modalidad']
+
+    headers = ['Día', 'Hora Inicio', 'Hora Fin',
+               'Curso', 'Docente', 'Modalidad']
     for col, header in enumerate(headers, start=1):
         cell = ws.cell(row=4, column=col, value=header)
         cell.fill = header_fill
         cell.font = header_font
         cell.border = border
         cell.alignment = Alignment(horizontal='center')
-    
+
     asignaciones = Asignacion.query.filter_by(
         id_ciclo=ciclo_id, id_seccion=seccion_id
     ).order_by(BloqueHorario.dia, BloqueHorario.hora_inicio).join(
         BloqueHorario, Asignacion.id_bloque == BloqueHorario.id
     ).all()
-    
+
     row = 5
     for a in asignaciones:
-        ws.cell(row=row, column=1, value=DIAS_NOMBRE[a.bloque.dia]).border = border
-        ws.cell(row=row, column=2, value=a.bloque.hora_inicio.strftime('%H:%M')).border = border
-        ws.cell(row=row, column=3, value=a.bloque.hora_fin.strftime('%H:%M')).border = border
+        ws.cell(row=row, column=1,
+                value=DIAS_NOMBRE[a.bloque.dia]).border = border
+        ws.cell(row=row, column=2, value=a.bloque.hora_inicio.strftime(
+            '%H:%M')).border = border
+        ws.cell(row=row, column=3, value=a.bloque.hora_fin.strftime(
+            '%H:%M')).border = border
         ws.cell(row=row, column=4, value=a.curso.nombre).border = border
-        ws.cell(row=row, column=5, value=a.docente.nombre_con_grado if a.docente else '—').border = border
-        ws.cell(row=row, column=6, value=MODALIDAD_NOMBRE.get(a.modalidad, a.modalidad)).border = border
+        ws.cell(row=row, column=5,
+                value=a.docente.nombre_con_grado if a.docente else '—').border = border
+        ws.cell(row=row, column=6, value=MODALIDAD_NOMBRE.get(
+            a.modalidad, a.modalidad)).border = border
         row += 1
-    
+
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 12
     ws.column_dimensions['C'].width = 12
     ws.column_dimensions['D'].width = 25
     ws.column_dimensions['E'].width = 25
     ws.column_dimensions['F'].width = 18
-    
+
     buffer = BytesIO()
     wb.save(buffer)
     buffer.seek(0)
     filename = f"horario_{carrera.codigo}_{seccion.semestre}_{seccion.nombre}_{ciclo.nombre}.xlsx"
-    return send_file(buffer, 
-                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    as_attachment=True, download_name=filename)
+    return send_file(buffer,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
 
 
 @app.route('/descargar/pdf/laboratorio/<int:ciclo_id>/<modalidad>')
@@ -1267,8 +1315,8 @@ def descargar_excel_laboratorio(ciclo_id, modalidad):
     nombre = MODALIDAD_NOMBRE.get(modalidad, modalidad).replace(' ', '_')
     filename = f"horario_{nombre}_{ciclo.nombre}.xlsx"
     return send_file(excel,
-                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    as_attachment=True, download_name=filename)
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
 
 
 @app.route('/descargar/pdf/todas-secciones/<int:ciclo_id>')
@@ -1278,6 +1326,7 @@ def descargar_pdf_todas_secciones(ciclo_id):
     filename = f"horarios_completos_{ciclo.nombre}.pdf"
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
+
 @app.route('/descargar/pdf/vitrina-presencial/<int:ciclo_id>')
 def descargar_pdf_vitrina_presencial(ciclo_id):
     """Descarga PDF de vitrina solo con secciones que tienen periodos presenciales."""
@@ -1286,14 +1335,15 @@ def descargar_pdf_vitrina_presencial(ciclo_id):
     filename = f"vitrina_presencial_{ciclo.nombre}.pdf"
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
+
 @app.route('/descargar/excel/todas-secciones/<int:ciclo_id>')
 def descargar_excel_todas_secciones(ciclo_id):
     ciclo = Ciclo.query.get_or_404(ciclo_id)
     excel = generar_excel_todas_secciones(ciclo)
     filename = f"horarios_completos_{ciclo.nombre}.xlsx"
     return send_file(excel,
-                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    as_attachment=True, download_name=filename)
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
 
 
 @app.route('/descargar/pdf/docente/<int:ciclo_id>/<int:docente_id>')
@@ -1301,7 +1351,8 @@ def descargar_pdf_docente(ciclo_id, docente_id):
     ciclo = Ciclo.query.get_or_404(ciclo_id)
     docente = Docente.query.get_or_404(docente_id)
     pdf = generar_pdf_docente(ciclo, docente)
-    filename = f"horario_{docente.apellidos}_{docente.nombres}_{ciclo.nombre}.pdf".replace(' ', '_')
+    filename = f"horario_{docente.apellidos}_{docente.nombres}_{ciclo.nombre}.pdf".replace(
+        ' ', '_')
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
 
@@ -1315,6 +1366,8 @@ def descargar_pdf_todos_docentes(ciclo_id):
 # ============================================================
 # Reportería: Vista por carrera
 # ============================================================
+
+
 @app.route('/reportes/carrera/<int:ciclo_id>')
 def reporte_carrera(ciclo_id):
     """Vista de horarios por carrera."""
@@ -1331,7 +1384,7 @@ def api_reporte_carreras(ciclo_id):
     carreras = db.session.query(Carrera).join(
         CicloCarrera, Carrera.id == CicloCarrera.id_carrera
     ).filter(CicloCarrera.id_ciclo == ciclo_id).order_by(Carrera.nombre).all()
-    
+
     return jsonify([{
         'id': c.id,
         'nombre': c.nombre,
@@ -1347,7 +1400,8 @@ def descargar_pdf_carrera(ciclo_id, carrera_id):
     ciclo = Ciclo.query.get_or_404(ciclo_id)
     carrera = Carrera.query.get_or_404(carrera_id)
     pdf = generar_pdf_carrera(ciclo, carrera)
-    filename = f"horarios_{carrera.codigo or carrera.nombre}_{ciclo.nombre}.pdf".replace(' ', '_')
+    filename = f"horarios_{carrera.codigo or carrera.nombre}_{ciclo.nombre}.pdf".replace(
+        ' ', '_')
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
 
@@ -1356,10 +1410,12 @@ def descargar_excel_carrera(ciclo_id, carrera_id):
     ciclo = Ciclo.query.get_or_404(ciclo_id)
     carrera = Carrera.query.get_or_404(carrera_id)
     excel = generar_excel_carrera(ciclo, carrera)
-    filename = f"horarios_{carrera.codigo or carrera.nombre}_{ciclo.nombre}.xlsx".replace(' ', '_')
+    filename = f"horarios_{carrera.codigo or carrera.nombre}_{ciclo.nombre}.xlsx".replace(
+        ' ', '_')
     return send_file(excel,
-                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    as_attachment=True, download_name=filename)
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
 
 with app.app_context():
     db.create_all()
