@@ -18,14 +18,16 @@ DIAS_CORTO = {1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb', 7: '
 MODALIDAD_NOMBRE = {
     'presencial': 'Presencial',
     'virtual': 'Virtual',
-    'laboratorio_escuela': 'Lab. Escuela',
+    'laboratorio_escuela_a': 'Lab. Escuela A',
+    'laboratorio_escuela_b': 'Lab. Escuela B',
     'laboratorio_radiologia': 'Lab. Radiología'
 }
 
 MODALIDAD_COLOR = {
     'presencial': '#D4EDDA',
     'virtual': '#E2D6F7',
-    'laboratorio_escuela': '#FFE5B4',
+    'laboratorio_escuela_a': '#FFE5B4',
+    'laboratorio_escuela_b': '#D1ECF1',
     'laboratorio_radiologia': '#FADBD8'
 }
 

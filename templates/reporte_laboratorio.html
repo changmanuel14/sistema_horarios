@@ -62,7 +62,11 @@
         dias.forEach(d => html += `<th>${d}</th>`);
         html += '</tr></thead><tbody>';
 
-        const colorBg = modalidad === 'laboratorio_escuela' ? 'bg-lab-escuela' : 'bg-lab-radiologia';
+        const colorBg = {
+            'laboratorio_escuela_a': 'bg-lab-escuela-a',
+            'laboratorio_escuela_b': 'bg-lab-escuela-b',
+            'laboratorio_radiologia': 'bg-lab-radiologia'
+        }[modalidad] || '';
 
         horasUnicas.forEach(h => {
             const ref = data.asignaciones.find(a => a.hora_inicio === h);

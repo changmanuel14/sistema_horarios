@@ -124,24 +124,22 @@
         const container = document.getElementById('labs-container');
         if (!cicloId) { container.classList.add('hidden'); return; }
 
-        container.innerHTML = `
+        const laboratorios = [
+            { id: 'laboratorio_escuela_a', nombre: '🔬 Laboratorio Escuela A' },
+            { id: 'laboratorio_escuela_b', nombre: '🔬 Laboratorio Escuela B' },
+            { id: 'laboratorio_radiologia', nombre: '☢️ Laboratorio Radiología' }
+        ];
+
+        container.innerHTML = laboratorios.map(lab => `
     <div class="item-reporte">
-      <span>🔬 Laboratorio Escuela</span>
+      <span>${lab.nombre}</span>
       <div class="acciones">
-        <a href="/reportes/laboratorio/${cicloId}?lab=laboratorio_escuela" class="btn-ver">Ver</a>
-        <a href="/descargar/pdf/laboratorio/${cicloId}/laboratorio_escuela" class="btn-download btn-pdf" target="_blank">PDF</a>
-        <a href="/descargar/excel/laboratorio/${cicloId}/laboratorio_escuela" class="btn-download btn-excel" target="_blank">Excel</a>
+        <a href="/reportes/laboratorio/${cicloId}?lab=${lab.id}" class="btn-ver">Ver</a>
+        <a href="/descargar/pdf/laboratorio/${cicloId}/${lab.id}" class="btn-download btn-pdf" target="_blank">PDF</a>
+        <a href="/descargar/excel/laboratorio/${cicloId}/${lab.id}" class="btn-download btn-excel" target="_blank">Excel</a>
       </div>
     </div>
-    <div class="item-reporte">
-      <span>☢️ Laboratorio Radiología</span>
-      <div class="acciones">
-        <a href="/reportes/laboratorio/${cicloId}?lab=laboratorio_radiologia" class="btn-ver">Ver</a>
-        <a href="/descargar/pdf/laboratorio/${cicloId}/laboratorio_radiologia" class="btn-download btn-pdf" target="_blank">PDF</a>
-        <a href="/descargar/excel/laboratorio/${cicloId}/laboratorio_radiologia" class="btn-download btn-excel" target="_blank">Excel</a>
-      </div>
-    </div>
-  `;
+  `).join('');
         container.classList.remove('hidden');
     }
 

@@ -12,7 +12,8 @@ function formatoModalidad(mod) {
     const nombres = {
         'presencial': '🏫 Presencial',
         'virtual': '💻 Virtual',
-        'laboratorio_escuela': '🔬 Lab. Escuela',
+        'laboratorio_escuela_a': '🔬 Lab. Escuela A',
+        'laboratorio_escuela_b': '🔬 Lab. Escuela B',
         'laboratorio_radiologia': '☢️ Lab. Radiología'
     };
     return nombres[mod] || mod;
@@ -184,7 +185,8 @@ function pintar() {
         const claseModalidad = {
             'presencial': 'presencial',
             'virtual': 'virtual',
-            'laboratorio_escuela': 'lab-escuela',
+            'laboratorio_escuela_a': 'lab-escuela-a',
+            'laboratorio_escuela_b': 'lab-escuela-b',
             'laboratorio_radiologia': 'lab-radiologia'
         };
         div.className = `bloque ${claseModalidad[a.modalidad] || 'presencial'}`;
@@ -339,9 +341,8 @@ async function validarTraslape(docenteId, bloqueId, asignacionId) {
 }
 
 async function validarLaboratorio(modalidad, bloqueId, asignacionId) {
-    console.log("-> Ejecutando validarLaboratorio:", { modalidad, bloqueId, asignacionId, cicloId });
-
-    if (modalidad !== 'laboratorio_escuela' && modalidad !== 'laboratorio_radiologia') {
+    const laboratorios = ['laboratorio_escuela_a', 'laboratorio_escuela_b', 'laboratorio_radiologia'];
+    if (!laboratorios.includes(modalidad)) {
         return true;
     }
 

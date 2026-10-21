@@ -940,7 +940,8 @@ def validar_laboratorio():
     asignacion_id = int(d.get('asignacion_id')) if d.get('asignacion_id') else None
     ciclo_id = int(d.get('ciclo_id')) if d.get('ciclo_id') else None
 
-    if modalidad not in ['laboratorio_escuela', 'laboratorio_radiologia']:
+    laboratorios = ['laboratorio_escuela_a', 'laboratorio_escuela_b', 'laboratorio_radiologia']
+    if modalidad not in laboratorios:
         return jsonify({'conflicto': False})
 
     if not bloque_id or not ciclo_id:
@@ -989,7 +990,12 @@ def validar_laboratorio():
             ciclo_conflicto = Ciclo.query.get(asignacion.id_ciclo)
             nombre_ciclo = ciclo_conflicto.nombre if ciclo_conflicto else "otro ciclo"
 
-            nombre_lab = "Laboratorio Escuela" if modalidad == 'laboratorio_escuela' else "Laboratorio Radiología"
+            nombres_labs = {
+                'laboratorio_escuela_a': 'Laboratorio Escuela A',
+                'laboratorio_escuela_b': 'Laboratorio Escuela B',
+                'laboratorio_radiologia': 'Laboratorio Radiología'
+            }
+            nombre_lab = nombres_labs.get(modalidad, modalidad)
 
             return jsonify({
                 'conflicto': True,

@@ -609,9 +609,14 @@ table.lista th {
 }
 
 /* Colores para las nuevas modalidades */
-.bloque.lab-escuela {
+.bloque.lab-escuela-a {
     background: #ffe5b4;
     border-left: 3px solid #e67e22;
+}
+
+.bloque.lab-escuela-b {
+    background: #d1ecf1;
+    border-left: 3px solid #17a2b8;
 }
 
 .bloque.lab-radiologia {
@@ -654,9 +659,14 @@ table.lista th {
     border-left: 3px solid #8e44ad;
 }
 
-.leyenda-color.lab-escuela {
+.leyenda-color.lab-escuela-a {
     background: #ffe5b4;
     border-left: 3px solid #e67e22;
+}
+
+.leyenda-color.lab-escuela-b {
+    background: #d1ecf1;
+    border-left: 3px solid #17a2b8;
 }
 
 .leyenda-color.lab-radiologia {
@@ -886,8 +896,12 @@ table.lista th {
     background: #e2d6f7;
 }
 
-.bg-lab-escuela {
+.bg-lab-escuela-a {
     background: #ffe5b4;
+}
+
+.bg-lab-escuela-b {
+    background: #d1ecf1;
 }
 
 .bg-lab-radiologia {
