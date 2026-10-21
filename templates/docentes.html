@@ -26,6 +26,9 @@
         <td>{{ d.nombre_completo }}</td>
         <td>{{ d.correo or '—' }}</td>
         <td>
+            <button class="btn-editar-docente" onclick="abrirEditarDocente({{ d.id }})">
+                ✏️ Editar
+            </button>
             <button class="btn-restricciones" onclick="abrirRestricciones({{ d.id }}, '{{ d.nombre_completo }}')">
                 ⚙️ Restricciones
             </button>
@@ -70,6 +73,38 @@
     </div>
 </div>
 
+<!-- Modal de edición de docente -->
+<div id="modal-editar-docente" class="modal hidden">
+    <div class="modal-content">
+        <h3>✏️ Editar Docente</h3>
+
+        <form id="form-editar-docente" onsubmit="return guardarEdicionDocente(event)">
+            <input type="hidden" id="edit-docente-id">
+
+            <label>Grado académico:
+                <input type="text" id="edit-grado-academico">
+            </label>
+            <label>Nombres:
+                <input type="text" id="edit-nombres" required>
+            </label>
+            <label>Apellidos:
+                <input type="text" id="edit-apellidos" required>
+            </label>
+            <label>Teléfono:
+                <input type="text" id="edit-telefono">
+            </label>
+            <label>Correo:
+                <input type="email" id="edit-correo">
+            </label>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn-primary">💾 Guardar Cambios</button>
+                <button type="button" onclick="cerrarModalEdicion()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     let docenteActual = null;
     const DIAS_NOMBRE = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -86,10 +121,75 @@
     }
 
     // ============================================================
-    // NUEVA FUNCIÓN: Eliminar docente
+    // NUEVAS FUNCIONES: Editar docente
+    // ============================================================
+    async function abrirEditarDocente(docenteId) {
+        try {
+            const res = await fetch(`/docentes/${docenteId}`);
+            if (!res.ok) {
+                alert('Error al cargar los datos del docente');
+                return;
+            }
+
+            const data = await res.json();
+
+            // Precargar los datos en el formulario
+            document.getElementById('edit-docente-id').value = data.id;
+            document.getElementById('edit-grado-academico').value = data.grado_academico;
+            document.getElementById('edit-nombres').value = data.nombres;
+            document.getElementById('edit-apellidos').value = data.apellidos;
+            document.getElementById('edit-telefono').value = data.telefono;
+            document.getElementById('edit-correo').value = data.correo;
+
+            // Mostrar el modal
+            document.getElementById('modal-editar-docente').classList.remove('hidden');
+        } catch (err) {
+            alert('❌ Error de conexión: ' + err.message);
+        }
+    }
+
+    async function guardarEdicionDocente(e) {
+        e.preventDefault();
+
+        const docenteId = document.getElementById('edit-docente-id').value;
+        const datos = {
+            grado_academico: document.getElementById('edit-grado-academico').value,
+            nombres: document.getElementById('edit-nombres').value,
+            apellidos: document.getElementById('edit-apellidos').value,
+            telefono: document.getElementById('edit-telefono').value,
+            correo: document.getElementById('edit-correo').value
+        };
+
+        try {
+            const response = await fetch(`/docentes/${docenteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datos)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert('✅ ' + result.mensaje);
+                location.reload();
+            } else {
+                alert('⚠️ ' + result.error);
+            }
+        } catch (err) {
+            alert('❌ Error de conexión: ' + err.message);
+        }
+
+        return false;
+    }
+
+    function cerrarModalEdicion() {
+        document.getElementById('modal-editar-docente').classList.add('hidden');
+    }
+
+    // ============================================================
+    // Función: Eliminar docente
     // ============================================================
     async function eliminarDocente(docenteId, nombreDocente) {
-        // Confirmación con el nombre del docente
         const confirmado = confirm(
             `¿Estás seguro de eliminar al docente "${nombreDocente}"?\n\n` +
             `Esta acción no se puede deshacer.`
@@ -116,7 +216,7 @@
     }
 
     // ============================================================
-    // Funciones de restricciones (sin cambios)
+    // Funciones de restricciones
     // ============================================================
     async function abrirRestricciones(docenteId, nombreDocente) {
         docenteActual = docenteId;

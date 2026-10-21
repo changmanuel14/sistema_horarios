@@ -385,6 +385,66 @@ def eliminar_docente(id):
         'ok': True,
         'mensaje': f"Docente '{docente.nombre_completo}' eliminado correctamente."
     })
+    
+@app.route('/docentes/<int:id>', methods=['GET'])
+def obtener_docente(id):
+    """Obtiene los datos de un docente."""
+    docente = Docente.query.get_or_404(id)
+    return jsonify({
+        'id': docente.id,
+        'grado_academico': docente.grado_academico or '',
+        'nombres': docente.nombres,
+        'apellidos': docente.apellidos,
+        'telefono': docente.telefono or '',
+        'correo': docente.correo or ''
+    })
+
+
+@app.route('/docentes/<int:id>', methods=['PUT'])
+def actualizar_docente(id):
+    """Actualiza los datos de un docente."""
+    docente = Docente.query.get_or_404(id)
+    d = request.json
+    
+    # Función auxiliar para convertir strings vacíos en None
+    def vacio_a_none(valor):
+        if valor is None:
+            return None
+        valor = str(valor).strip()
+        return valor if valor else None
+    
+    # Validar campos obligatorios
+    nombres = d.get('nombres', '').strip()
+    apellidos = d.get('apellidos', '').strip()
+    
+    if not nombres or not apellidos:
+        return jsonify({'error': 'Nombres y apellidos son obligatorios'}), 400
+    
+    # Validar correo único (si se cambió)
+    nuevo_correo = vacio_a_none(d.get('correo'))
+    if nuevo_correo and nuevo_correo != docente.correo:
+        docente_existente = Docente.query.filter(
+            Docente.correo == nuevo_correo,
+            Docente.id != id
+        ).first()
+        if docente_existente:
+            return jsonify({
+                'error': f'El correo "{nuevo_correo}" ya está registrado por otro docente.'
+            }), 400
+    
+    # Actualizar datos
+    docente.grado_academico = vacio_a_none(d.get('grado_academico'))
+    docente.nombres = nombres
+    docente.apellidos = apellidos
+    docente.telefono = vacio_a_none(d.get('telefono'))
+    docente.correo = nuevo_correo
+    
+    db.session.commit()
+    
+    return jsonify({
+        'ok': True,
+        'mensaje': f"Docente '{docente.nombre_completo}' actualizado correctamente."
+    })
 
 # ============================================================
 # CRUD: Ciclos
