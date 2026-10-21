@@ -1105,3 +1105,27 @@ table.lista th {
 .btn-editar-docente:hover {
     background: #d68910;
 }
+
+/* Select2 en las vistas de reportería */
+.reporte-controls .select2-container {
+    min-width: 320px;
+}
+
+.reporte-controls .select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+}
+
+.reporte-controls .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+    color: #2c3e50;
+}
+
+.reporte-controls .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 36px;
+}
+
+.reporte-controls .select2-container--default .select2-selection--single .select2-selection__placeholder {
+    color: #7f8c8d;
+}
