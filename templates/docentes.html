@@ -29,6 +29,9 @@
             <button class="btn-restricciones" onclick="abrirRestricciones({{ d.id }}, '{{ d.nombre_completo }}')">
                 ⚙️ Restricciones
             </button>
+            <button class="btn-eliminar-docente" onclick="eliminarDocente({{ d.id }}, '{{ d.nombre_completo }}')">
+                🗑️ Eliminar
+            </button>
         </td>
     </tr>
     {% endfor %}
@@ -82,15 +85,44 @@
         }
     }
 
+    // ============================================================
+    // NUEVA FUNCIÓN: Eliminar docente
+    // ============================================================
+    async function eliminarDocente(docenteId, nombreDocente) {
+        // Confirmación con el nombre del docente
+        const confirmado = confirm(
+            `¿Estás seguro de eliminar al docente "${nombreDocente}"?\n\n` +
+            `Esta acción no se puede deshacer.`
+        );
+
+        if (!confirmado) return;
+
+        try {
+            const response = await fetch(`/docentes/${docenteId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert('✅ ' + data.mensaje);
+                location.reload();
+            } else {
+                alert('⚠️ ' + data.error);
+            }
+        } catch (err) {
+            alert('❌ Error de conexión: ' + err.message);
+        }
+    }
+
+    // ============================================================
+    // Funciones de restricciones (sin cambios)
+    // ============================================================
     async function abrirRestricciones(docenteId, nombreDocente) {
         docenteActual = docenteId;
         document.getElementById('nombre-docente-restricciones').textContent = nombreDocente;
         document.getElementById('modal-restricciones').classList.remove('hidden');
-
-        // Llenar selects de horas
         llenarSelectsHoras();
-
-        // Cargar restricciones existentes
         await cargarRestricciones();
     }
 
@@ -123,7 +155,6 @@
             return;
         }
 
-        // Ordenar por día y hora
         restricciones.sort((a, b) => {
             if (a.dia !== b.dia) return a.dia - b.dia;
             return a.hora_inicio.localeCompare(b.hora_inicio);

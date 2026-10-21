@@ -1075,3 +1075,18 @@ table.lista th {
 .select2-results__option--highlighted[aria-selected] {
     background-color: #3498db !important;
 }
+
+.btn-eliminar-docente {
+    padding: 6px 12px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    margin-left: 5px;
+}
+
+.btn-eliminar-docente:hover {
+    background: #c0392b;
+}

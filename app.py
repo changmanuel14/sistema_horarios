@@ -363,6 +363,28 @@ def docentes():
         return jsonify({'ok': True})
     return render_template('docentes.html', docentes=Docente.query.order_by(Docente.grado_academico, Docente.nombres, Docente.apellidos).all())
 
+@app.route('/docentes/<int:id>', methods=['DELETE'])
+def eliminar_docente(id):
+    """Elimina un docente si no tiene asignaciones."""
+    docente = Docente.query.get_or_404(id)
+    # Verificar si el docente tiene asignaciones en algún ciclo
+    total_asignaciones = Asignacion.query.filter_by(id_docente=id).count()
+    
+    if total_asignaciones > 0:
+        return jsonify({
+            'error': f"No se puede eliminar al docente '{docente.nombre_completo}' porque "
+                    f"tiene {total_asignaciones} asignacion(es) registrada(s). "
+                    f"Primero debes reasignar o eliminar esas clases."
+        }), 400
+    
+    # Si no tiene asignaciones, eliminar (las restricciones se borran en cascade)
+    db.session.delete(docente)
+    db.session.commit()
+    
+    return jsonify({
+        'ok': True,
+        'mensaje': f"Docente '{docente.nombre_completo}' eliminado correctamente."
+    })
 
 # ============================================================
 # CRUD: Ciclos
