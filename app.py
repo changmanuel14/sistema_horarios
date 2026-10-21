@@ -363,29 +363,31 @@ def docentes():
         return jsonify({'ok': True})
     return render_template('docentes.html', docentes=Docente.query.order_by(Docente.grado_academico, Docente.nombres, Docente.apellidos).all())
 
+
 @app.route('/docentes/<int:id>', methods=['DELETE'])
 def eliminar_docente(id):
     """Elimina un docente si no tiene asignaciones."""
     docente = Docente.query.get_or_404(id)
     # Verificar si el docente tiene asignaciones en algún ciclo
     total_asignaciones = Asignacion.query.filter_by(id_docente=id).count()
-    
+
     if total_asignaciones > 0:
         return jsonify({
             'error': f"No se puede eliminar al docente '{docente.nombre_completo}' porque "
-                    f"tiene {total_asignaciones} asignacion(es) registrada(s). "
-                    f"Primero debes reasignar o eliminar esas clases."
+            f"tiene {total_asignaciones} asignacion(es) registrada(s). "
+            f"Primero debes reasignar o eliminar esas clases."
         }), 400
-    
+
     # Si no tiene asignaciones, eliminar (las restricciones se borran en cascade)
     db.session.delete(docente)
     db.session.commit()
-    
+
     return jsonify({
         'ok': True,
         'mensaje': f"Docente '{docente.nombre_completo}' eliminado correctamente."
     })
-    
+
+
 @app.route('/docentes/<int:id>', methods=['GET'])
 def obtener_docente(id):
     """Obtiene los datos de un docente."""
@@ -405,21 +407,21 @@ def actualizar_docente(id):
     """Actualiza los datos de un docente."""
     docente = Docente.query.get_or_404(id)
     d = request.json
-    
+
     # Función auxiliar para convertir strings vacíos en None
     def vacio_a_none(valor):
         if valor is None:
             return None
         valor = str(valor).strip()
         return valor if valor else None
-    
+
     # Validar campos obligatorios
     nombres = d.get('nombres', '').strip()
     apellidos = d.get('apellidos', '').strip()
-    
+
     if not nombres or not apellidos:
         return jsonify({'error': 'Nombres y apellidos son obligatorios'}), 400
-    
+
     # Validar correo único (si se cambió)
     nuevo_correo = vacio_a_none(d.get('correo'))
     if nuevo_correo and nuevo_correo != docente.correo:
@@ -431,16 +433,16 @@ def actualizar_docente(id):
             return jsonify({
                 'error': f'El correo "{nuevo_correo}" ya está registrado por otro docente.'
             }), 400
-    
+
     # Actualizar datos
     docente.grado_academico = vacio_a_none(d.get('grado_academico'))
     docente.nombres = nombres
     docente.apellidos = apellidos
     docente.telefono = vacio_a_none(d.get('telefono'))
     docente.correo = nuevo_correo
-    
+
     db.session.commit()
-    
+
     return jsonify({
         'ok': True,
         'mensaje': f"Docente '{docente.nombre_completo}' actualizado correctamente."
@@ -449,6 +451,8 @@ def actualizar_docente(id):
 # ============================================================
 # CRUD: Ciclos
 # ============================================================
+
+
 @app.route('/ciclos', methods=['GET', 'POST'])
 def ciclos():
     if request.method == 'POST':
@@ -937,10 +941,12 @@ def validar_laboratorio():
     d = request.json
     modalidad = d.get('modalidad')
     bloque_id = int(d.get('bloque_id')) if d.get('bloque_id') else None
-    asignacion_id = int(d.get('asignacion_id')) if d.get('asignacion_id') else None
+    asignacion_id = int(d.get('asignacion_id')) if d.get(
+        'asignacion_id') else None
     ciclo_id = int(d.get('ciclo_id')) if d.get('ciclo_id') else None
 
-    laboratorios = ['laboratorio_escuela_a', 'laboratorio_escuela_b', 'laboratorio_radiologia']
+    laboratorios = ['laboratorio_escuela_a',
+                    'laboratorio_escuela_b', 'laboratorio_radiologia']
     if modalidad not in laboratorios:
         return jsonify({'conflicto': False})
 
@@ -968,13 +974,15 @@ def validar_laboratorio():
     # Buscar TODAS las asignaciones de TODOS los ciclos superpuestos
     # con la misma modalidad de laboratorio que tengan un bloque el mismo día
     asignaciones_lab = db.session.query(Asignacion).join(BloqueHorario).filter(
-        Asignacion.id_ciclo.in_(ciclos_ids),  # ← Buscar en todos los ciclos superpuestos
+        # ← Buscar en todos los ciclos superpuestos
+        Asignacion.id_ciclo.in_(ciclos_ids),
         Asignacion.modalidad == modalidad,
         BloqueHorario.dia == dia_objetivo
     )
 
     if asignacion_id:
-        asignaciones_lab = asignaciones_lab.filter(Asignacion.id != asignacion_id)
+        asignaciones_lab = asignaciones_lab.filter(
+            Asignacion.id != asignacion_id)
 
     # Verificar traslape por intervalos de tiempo
     for asignacion in asignaciones_lab.all():
@@ -985,7 +993,8 @@ def validar_laboratorio():
         if obj_inicio_min < b_fin_min and b_inicio_min < obj_fin_min:
             sec_conflicto = Seccion.query.get(asignacion.id_seccion)
             nombre_seccion = sec_conflicto.nombre if sec_conflicto else "otra sección"
-            carrera = Carrera.query.get(sec_conflicto.id_carrera) if sec_conflicto else None
+            carrera = Carrera.query.get(
+                sec_conflicto.id_carrera) if sec_conflicto else None
             nombre_carrera = carrera.nombre if carrera else ""
             ciclo_conflicto = Ciclo.query.get(asignacion.id_ciclo)
             nombre_ciclo = ciclo_conflicto.nombre if ciclo_conflicto else "otro ciclo"
@@ -1000,7 +1009,7 @@ def validar_laboratorio():
             return jsonify({
                 'conflicto': True,
                 'mensaje': f"El {nombre_lab} ya está ocupado en ese horario por el curso '{asignacion.curso.nombre}' "
-                          f"de la Sección {nombre_seccion} ({nombre_carrera}) del ciclo {nombre_ciclo}."
+                f"de la Sección {nombre_seccion} ({nombre_carrera}) del ciclo {nombre_ciclo}."
             })
 
     return jsonify({'conflicto': False})
@@ -1044,84 +1053,87 @@ def propagar_docente(id):
     """Propaga el docente a todos los periodos del mismo curso en la misma sección y ciclo."""
     d = request.json
     docente_id = d.get('docente_id')
-    
+
     if not docente_id:
         return jsonify({'error': 'Debe seleccionar un docente'}), 400
-    
+
     asignacion_base = Asignacion.query.get_or_404(id)
-    
+
     # Buscar todas las asignaciones del MISMO curso en la MISMA sección del MISMO ciclo
     asignaciones_curso = Asignacion.query.filter_by(
         id_ciclo=asignacion_base.id_ciclo,
         id_seccion=asignacion_base.id_seccion,
         id_curso=asignacion_base.id_curso
     ).all()
-    
+
     # Obtener IDs de las asignaciones del curso para excluir de la búsqueda de conflictos
     ids_asignaciones_curso = [a.id for a in asignaciones_curso]
-    
+
     # ---------------------------------------------------------
     # Obtener ciclos superpuestos
     # ---------------------------------------------------------
     ciclos_ids = obtener_ciclos_superpuestos(asignacion_base.id_ciclo)
-    
+
     conflictos = []
     for asignacion in asignaciones_curso:
         if asignacion.id == id:
             continue
-        
+
         # Si ya tiene el mismo docente, no hay nada que hacer
         if asignacion.id_docente == docente_id:
             continue
-        
+
         bloque_objetivo = asignacion.bloque
-        
+
         # Buscar conflictos EXCLUYENDO las asignaciones del mismo curso
         # y buscando en TODOS los ciclos superpuestos
         conflicto = db.session.query(Asignacion).join(BloqueHorario).filter(
             Asignacion.id_docente == docente_id,
-            Asignacion.id_ciclo.in_(ciclos_ids),  # ← Buscar en todos los ciclos superpuestos
+            # ← Buscar en todos los ciclos superpuestos
+            Asignacion.id_ciclo.in_(ciclos_ids),
             BloqueHorario.dia == bloque_objetivo.dia,
             Asignacion.id.notin_(ids_asignaciones_curso)
         ).first()
-        
+
         if conflicto:
             b_conf = conflicto.bloque
             conf_inicio = b_conf.hora_inicio.hour * 60 + b_conf.hora_inicio.minute
             conf_fin = b_conf.hora_fin.hour * 60 + b_conf.hora_fin.minute
-            obj_inicio = bloque_objetivo.hora_inicio.hour * 60 + bloque_objetivo.hora_inicio.minute
+            obj_inicio = bloque_objetivo.hora_inicio.hour * \
+                60 + bloque_objetivo.hora_inicio.minute
             obj_fin = bloque_objetivo.hora_fin.hour * 60 + bloque_objetivo.hora_fin.minute
-            
+
             if obj_inicio < conf_fin and conf_inicio < obj_fin:
                 ciclo_conflicto = Ciclo.query.get(conflicto.id_ciclo)
                 nombre_ciclo = ciclo_conflicto.nombre if ciclo_conflicto else "otro ciclo"
-                
+
                 conflictos.append({
                     'bloque': f"{DIAS_NOMBRE[bloque_objetivo.dia]} {bloque_objetivo.hora_inicio.strftime('%H:%M')}-{bloque_objetivo.hora_fin.strftime('%H:%M')}",
                     'curso_conflicto': conflicto.curso.nombre,
                     'ciclo_conflicto': nombre_ciclo
                 })
-    
+
     if conflictos:
         mensaje = "No se puede propagar el docente por los siguientes traslapes:\n"
         for c in conflictos:
             mensaje += f"  • En {c['bloque']} del ciclo {c['ciclo_conflicto']}, el docente ya imparte '{c['curso_conflicto']}'\n"
         return jsonify({'error': mensaje}), 400
-    
+
     # Propagar el docente solo a las asignaciones que no lo tienen
     actualizadas = 0
     for asignacion in asignaciones_curso:
         if asignacion.id_docente != docente_id:
             asignacion.id_docente = docente_id
             actualizadas += 1
-    
+
     db.session.commit()
-    
+
     return jsonify({
         'ok': True,
         'actualizadas': actualizadas,
         'total': len(asignaciones_curso)
     })
+
 
 @app.route('/api/asignacion/<int:id>', methods=['DELETE'])
 def eliminar_asignacion(id):
@@ -1231,7 +1243,10 @@ def api_reporte_laboratorio(ciclo_id, modalidad):
     """Devuelve los datos del horario de un laboratorio."""
     from reportes import MODALIDAD_NOMBRE
 
-    if modalidad not in ['laboratorio_escuela', 'laboratorio_radiologia']:
+    laboratorios = ['laboratorio_escuela_a',
+                    'laboratorio_escuela_b', 'laboratorio_radiologia']
+
+    if modalidad not in laboratorios:
         return jsonify({'error': 'Modalidad inválida'}), 400
 
     asignaciones = Asignacion.query.filter_by(
