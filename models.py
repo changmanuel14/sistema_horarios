@@ -96,8 +96,9 @@ class Asignacion(db.Model):
     id_docente = db.Column(db.Integer, db.ForeignKey('docente.id'))
     id_bloque = db.Column(db.Integer, db.ForeignKey('bloque_horario.id'), nullable=False)
     modalidad = db.Column(
-    db.Enum('presencial', 'virtual', 'laboratorio_escuela', 'laboratorio_radiologia', name='modalidad_enum'), 
-    default='presencial')
+    db.Enum('presencial', 'virtual', 'laboratorio_escuela_a', 'laboratorio_escuela_b', 'laboratorio_radiologia', name='modalidad_enum'), 
+    default='presencial'
+)
 
     seccion = db.relationship('Seccion')
     curso = db.relationship('Curso')
