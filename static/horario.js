@@ -456,24 +456,90 @@ document.getElementById('btn-eliminar-modal').onclick = async () => {
 // ============================================================
 // Carga de datos auxiliares
 // ============================================================
-async function cargarDocentes() {
-    const ds = await fetch('/api/docentes').then(r => r.json());
-    const sel = document.getElementById('sel-docente');
-    sel.innerHTML = '<option value="">— Sin asignar —</option>' +
-        ds.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+let docenteReporteSeleccionado = null;
 
-    // Inicializar Select2 UNA SOLA VEZ al cargar la página
-    $(sel).select2({
-        placeholder: 'Buscar docente...',
-        allowClear: true,
-        width: '100%',
-        dropdownParent: $('#modal-docente'),
-        language: {
-            noResults: () => 'No se encontraron docentes',
-            searching: () => 'Buscando...',
-            inputTooShort: () => 'Escribe para buscar'
+async function cargarDocentes(cicloId) {
+    const labelSelect = document.getElementById('label-docente-select');
+    const selectDocente = document.getElementById('select-docente-reporte');
+    const accionesDiv = document.getElementById('docentes-acciones');
+
+    // Si no hay ciclo seleccionado, ocultar todo
+    if (!cicloId) {
+        labelSelect.classList.add('hidden');
+        accionesDiv.classList.add('hidden');
+        // Destruir Select2 si existe
+        if (window.jQuery && window.jQuery.fn.select2) {
+            window.jQuery(selectDocente).select2('destroy');
         }
-    });
+        return;
+    }
+
+    // Cargar lista de docentes
+    try {
+        const res = await fetch('/api/docentes');
+        const docentes = await res.json();
+
+        // Llenar el select con los docentes
+        selectDocente.innerHTML = '<option value="">-- Seleccionar docente --</option>' +
+            docentes.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+
+        // Mostrar el label del select
+        labelSelect.classList.remove('hidden');
+
+        // Inicializar Select2 (destruir primero si ya existe)
+        if (window.jQuery && window.jQuery.fn.select2) {
+            window.jQuery(selectDocente).select2('destroy');
+            window.jQuery(selectDocente).select2({
+                placeholder: 'Buscar docente por nombre...',
+                allowClear: true,
+                width: '100%',
+                dropdownParent: window.jQuery('.reporte-card').eq(2), // Tercera tarjeta (docentes)
+                language: {
+                    noResults: () => 'No se encontraron docentes',
+                    searching: () => 'Buscando...',
+                    inputTooShort: () => 'Escribe para buscar'
+                }
+            });
+
+            // Escuchar cambios en la selección
+            window.jQuery(selectDocente).on('change', function () {
+                docenteReporteSeleccionado = this.value;
+                actualizarAccionesDocente(cicloId, this.value);
+            });
+        } else {
+            // Respaldo sin jQuery
+            selectDocente.onchange = function () {
+                docenteReporteSeleccionado = this.value;
+                actualizarAccionesDocente(cicloId, this.value);
+            };
+        }
+
+        // Limpiar acciones previas
+        accionesDiv.classList.add('hidden');
+        accionesDiv.innerHTML = '';
+
+    } catch (err) {
+        console.error('Error al cargar docentes:', err);
+        labelSelect.classList.add('hidden');
+        alert('❌ Error al cargar la lista de docentes');
+    }
+}
+
+function actualizarAccionesDocente(cicloId, docenteId) {
+    const accionesDiv = document.getElementById('docentes-acciones');
+
+    if (!docenteId) {
+        accionesDiv.classList.add('hidden');
+        return;
+    }
+
+    accionesDiv.innerHTML = `
+    <div class="botones-accion">
+      <a href="/reportes/docente/${cicloId}?docente=${docenteId}" class="btn-ver">👁️ Ver Horario</a>
+      <a href="/descargar/pdf/docente/${cicloId}/${docenteId}" class="btn-download btn-pdf" target="_blank">📄 Descargar PDF</a>
+    </div>
+  `;
+    accionesDiv.classList.remove('hidden');
 }
 
 async function cargarCursos(seccionId) {

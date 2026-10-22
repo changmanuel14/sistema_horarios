@@ -1143,3 +1143,47 @@ table.lista th {
 .reporte-controls .select2-container--default .select2-selection--single .select2-selection__placeholder {
     color: #7f8c8d;
 }
+
+/* Select de docente en la tarjeta de reportería */
+#label-docente-select {
+    display: block;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+#label-docente-select.hidden {
+    display: none;
+}
+
+#docentes-acciones {
+    margin-top: 15px;
+}
+
+#docentes-acciones.hidden {
+    display: none;
+}
+
+/* Ajustes para Select2 dentro de las tarjetas de reportería */
+.reporte-card .select2-container {
+    min-width: 100%;
+    margin-top: 5px;
+}
+
+.reporte-card .select2-container--default .select2-selection--single {
+    height: 38px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+}
+
+.reporte-card .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+    color: #2c3e50;
+}
+
+.reporte-card .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 36px;
+}
+
+.reporte-card .select2-container--default .select2-selection--single .select2-selection__placeholder {
+    color: #7f8c8d;
+}
