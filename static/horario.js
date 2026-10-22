@@ -378,79 +378,110 @@ async function validarLaboratorio(modalidad, bloqueId, asignacionId) {
 // ============================================================
 function abrirModalDocente(a) {
     asignacionEditando = a;
-    document.getElementById('modal-docente').classList.remove('hidden');
 
-    // Establecer el valor del docente y disparar el evento change
-    // Select2 detectará el cambio y actualizará la visualización
+    const modal = document.getElementById('modal-docente');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+
+    // Establecer el valor del docente y disparar el evento change para Select2
     const valorDocente = a.docente_id ? String(a.docente_id) : '';
-    $('#sel-docente').val(valorDocente).trigger('change');
+    if (window.jQuery) {
+        $('#sel-docente').val(valorDocente).trigger('change');
+    } else {
+        document.getElementById('sel-docente').value = valorDocente;
+    }
 
     // Establecer modalidad
-    document.getElementById('sel-modalidad').value = a.modalidad;
+    const selModalidad = document.getElementById('sel-modalidad');
+    if (selModalidad) {
+        selModalidad.value = a.modalidad || 'presencial';
+    }
 
     // Info del curso
-    document.getElementById('info-curso').textContent =
-        `${a.curso} — ${a.dia ? DIAS_NOMBRE[a.dia] : ''} ${a.hora_inicio}-${a.hora_fin}`;
+    const infoCurso = document.getElementById('info-curso');
+    if (infoCurso) {
+        infoCurso.textContent = `${a.curso} — ${a.dia ? DIAS_NOMBRE[a.dia] : ''} ${a.hora_inicio}-${a.hora_fin}`;
+    }
 }
 
-document.getElementById('btn-cancelar-docente').onclick = () => {
-    document.getElementById('modal-docente').classList.add('hidden');
-};
+const btnCancelarDocente = document.getElementById('btn-cancelar-docente');
+if (btnCancelarDocente) {
+    btnCancelarDocente.onclick = () => {
+        const modal = document.getElementById('modal-docente');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    };
+}
 
-document.getElementById('btn-confirmar-docente').onclick = async () => {
-    const docenteId = parseInt(document.getElementById('sel-docente').value) || null;
-    const modalidad = document.getElementById('sel-modalidad').value;
+const btnConfirmarDocente = document.getElementById('btn-confirmar-docente');
+if (btnConfirmarDocente) {
+    btnConfirmarDocente.onclick = async () => {
+        const selDocente = document.getElementById('sel-docente');
+        const docenteId = selDocente && selDocente.value ? parseInt(selDocente.value) : null;
 
-    // 1. Validar traslape de docente (si hay docente)
-    if (docenteId) {
-        const okDocente = await validarTraslape(
-            docenteId, asignacionEditando.bloque_id, asignacionEditando.id
+        const selModalidad = document.getElementById('sel-modalidad');
+        const modalidad = selModalidad ? selModalidad.value : 'presencial';
+
+        if (!asignacionEditando) return;
+
+        // 1. Validar traslape de docente (si hay docente)
+        if (docenteId) {
+            const okDocente = await validarTraslape(
+                docenteId, asignacionEditando.bloque_id, asignacionEditando.id
+            );
+            if (!okDocente) return; // Si hay traslape, no cerramos el modal
+        }
+
+        // 2. Validar traslape de laboratorio
+        const okLab = await validarLaboratorio(
+            modalidad, asignacionEditando.bloque_id, asignacionEditando.id
         );
-        if (!okDocente) return;
-    }
+        if (!okLab) return;
 
-    // 2. Validar traslape de laboratorio (si es un laboratorio)
-    const okLab = await validarLaboratorio(
-        modalidad, asignacionEditando.bloque_id, asignacionEditando.id
-    );
-    if (!okLab) return;
-
-    // 3. Actualizar la asignación base
-    await fetch(`/api/asignacion/${asignacionEditando.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ docente_id: docenteId, modalidad })
-    });
-
-    // 4. Propagar docente si corresponde
-    if (docenteId) {
-        const response = await fetch(`/api/asignacion/${asignacionEditando.id}/propagar-docente`, {
-            method: 'POST',
+        // 3. Actualizar la asignación base
+        await fetch(`/api/asignacion/${asignacionEditando.id}`, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ docente_id: docenteId })
+            body: JSON.stringify({ docente_id: docenteId, modalidad })
         });
 
-        if (response.ok) {
-            const result = await response.json();
-            if (result.actualizadas > 0) {
-                alert(`✅ Docente asignado a los ${result.total} periodos del curso "${asignacionEditando.curso}".`);
-            }
-        } else {
-            // Revertir si hubo error
-            await fetch(`/api/asignacion/${asignacionEditando.id}`, {
-                method: 'PUT',
+        // 4. Propagar docente si corresponde
+        if (docenteId) {
+            const response = await fetch(`/api/asignacion/${asignacionEditando.id}/propagar-docente`, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ docente_id: null })
+                body: JSON.stringify({ docente_id: docenteId })
             });
-            const err = await response.json();
-            alert('⚠️ ' + err.error);
-        }
-    }
 
-    // 5. Cerrar modal (sin destruir Select2)
-    document.getElementById('modal-docente').classList.add('hidden');
-    cargarAsignaciones();
-};
+            if (response.ok) {
+                const result = await response.json();
+                if (result.actualizadas > 0) {
+                    alert(`✅ Docente asignado a los ${result.total} periodos del curso "${asignacionEditando.curso}".`);
+                }
+            } else {
+                // Revertir si hubo error
+                await fetch(`/api/asignacion/${asignacionEditando.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ docente_id: null })
+                });
+                const err = await response.json();
+                alert('⚠️ ' + (err.error || 'Error al propagar docente'));
+            }
+        }
+
+        // 5. Cerrar modal
+        const modal = document.getElementById('modal-docente');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+
+        // Recargar la grilla
+        cargarAsignaciones();
+    };
+}
 
 document.getElementById('btn-eliminar-modal').onclick = async () => {
     if (!asignacionEditando) return;
@@ -466,70 +497,39 @@ document.getElementById('btn-eliminar-modal').onclick = async () => {
 // ============================================================
 let docenteReporteSeleccionado = null;
 
-async function cargarDocentes(cicloId) {
-    const labelSelect = document.getElementById('label-docente-select');
-    const selectDocente = document.getElementById('select-docente-reporte');
-    const accionesDiv = document.getElementById('docentes-acciones');
-
-    // Si no hay ciclo seleccionado, ocultar todo
-    if (!cicloId) {
-        labelSelect.classList.add('hidden');
-        accionesDiv.classList.add('hidden');
-        // Destruir Select2 si existe
-        if (window.jQuery && window.jQuery.fn.select2) {
-            window.jQuery(selectDocente).select2('destroy');
-        }
-        return;
-    }
-
-    // Cargar lista de docentes
+async function cargarDocentes() {
     try {
-        const res = await fetch('/api/docentes');
-        const docentes = await res.json();
+        const ds = await fetch('/api/docentes').then(r => r.json());
+        const sel = document.getElementById('sel-docente');
 
-        // Llenar el select con los docentes
-        selectDocente.innerHTML = '<option value="">-- Seleccionar docente --</option>' +
-            docentes.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+        // Protección: si el select no existe en esta vista, no hacer nada
+        if (!sel) {
+            console.warn("El elemento 'sel-docente' no existe en esta vista.");
+            return;
+        }
 
-        // Mostrar el label del select
-        labelSelect.classList.remove('hidden');
+        sel.innerHTML = '<option value="">— Sin asignar —</option>' +
+            ds.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
 
-        // Inicializar Select2 (destruir primero si ya existe)
+        // Inicializar Select2 UNA SOLA VEZ al cargar la página
         if (window.jQuery && window.jQuery.fn.select2) {
-            window.jQuery(selectDocente).select2('destroy');
-            window.jQuery(selectDocente).select2({
-                placeholder: 'Buscar docente por nombre...',
+            // Destruir por si acaso ya existía
+            try { $(sel).select2('destroy'); } catch (e) { }
+
+            $(sel).select2({
+                placeholder: 'Buscar docente...',
                 allowClear: true,
                 width: '100%',
-                dropdownParent: window.jQuery('.reporte-card').eq(2), // Tercera tarjeta (docentes)
+                dropdownParent: $('#modal-docente'),
                 language: {
                     noResults: () => 'No se encontraron docentes',
                     searching: () => 'Buscando...',
                     inputTooShort: () => 'Escribe para buscar'
                 }
             });
-
-            // Escuchar cambios en la selección
-            window.jQuery(selectDocente).on('change', function () {
-                docenteReporteSeleccionado = this.value;
-                actualizarAccionesDocente(cicloId, this.value);
-            });
-        } else {
-            // Respaldo sin jQuery
-            selectDocente.onchange = function () {
-                docenteReporteSeleccionado = this.value;
-                actualizarAccionesDocente(cicloId, this.value);
-            };
         }
-
-        // Limpiar acciones previas
-        accionesDiv.classList.add('hidden');
-        accionesDiv.innerHTML = '';
-
-    } catch (err) {
-        console.error('Error al cargar docentes:', err);
-        labelSelect.classList.add('hidden');
-        alert('❌ Error al cargar la lista de docentes');
+    } catch (error) {
+        console.error("Error al cargar docentes:", error);
     }
 }
 
