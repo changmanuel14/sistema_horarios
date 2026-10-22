@@ -151,23 +151,89 @@
     // ============================================================
     // Función: Cargar Docentes
     // ============================================================
+    let docenteReporteSeleccionado = null;
+
     async function cargarDocentes(cicloId) {
-        const container = document.getElementById('docentes-container');
-        if (!cicloId) { container.classList.add('hidden'); return; }
+        const labelSelect = document.getElementById('label-docente-select');
+        const selectDocente = document.getElementById('select-docente-reporte');
+        const accionesDiv = document.getElementById('docentes-acciones');
 
-        const res = await fetch('/api/docentes');
-        const docentes = await res.json();
+        // Si no hay ciclo, ocultar todo
+        if (!cicloId) {
+            labelSelect.classList.add('hidden');
+            accionesDiv.classList.add('hidden');
+            if (window.jQuery && window.jQuery.fn.select2) {
+                try { window.jQuery(selectDocente).select2('destroy'); } catch (e) { }
+            }
+            return;
+        }
 
-        container.innerHTML = docentes.map(d => `
-    <div class="item-reporte">
-      <span>${d.nombre}</span>
-      <div class="acciones">
-        <a href="/reportes/docente/${cicloId}?docente=${d.id}" class="btn-ver">Ver</a>
-        <a href="/descargar/pdf/docente/${cicloId}/${d.id}" class="btn-download btn-pdf" target="_blank">PDF</a>
-      </div>
+        try {
+            // 1. Cargar lista de docentes
+            const res = await fetch('/api/docentes');
+            const docentes = await res.json();
+
+            // 2. Llenar el select
+            selectDocente.innerHTML = '<option value="">-- Seleccionar docente --</option>' +
+                docentes.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+
+            // 3. MOSTRAR el label primero (antes de inicializar Select2)
+            labelSelect.classList.remove('hidden');
+
+            // 4. Inicializar Select2 de forma segura
+            if (window.jQuery && window.jQuery.fn.select2) {
+                // Destruir si ya existe (sin error)
+                try { window.jQuery(selectDocente).select2('destroy'); } catch (e) { }
+
+                // Inicializar SIN dropdownParent (más compatible)
+                window.jQuery(selectDocente).select2({
+                    placeholder: 'Buscar docente por nombre...',
+                    allowClear: true,
+                    width: '100%',
+                    language: {
+                        noResults: () => 'No se encontraron docentes',
+                        searching: () => 'Buscando...'
+                    }
+                });
+
+                // Escuchar cambios
+                window.jQuery(selectDocente).on('change', function () {
+                    docenteReporteSeleccionado = this.value;
+                    actualizarAccionesDocente(cicloId, this.value);
+                });
+            } else {
+                // Respaldo sin jQuery
+                selectDocente.onchange = function () {
+                    docenteReporteSeleccionado = this.value;
+                    actualizarAccionesDocente(cicloId, this.value);
+                };
+            }
+
+            // 5. Limpiar acciones previas
+            accionesDiv.classList.add('hidden');
+            accionesDiv.innerHTML = '';
+
+        } catch (err) {
+            console.error('Error al cargar docentes:', err);
+            alert('❌ Error al cargar la lista de docentes: ' + err.message);
+        }
+    }
+
+    function actualizarAccionesDocente(cicloId, docenteId) {
+        const accionesDiv = document.getElementById('docentes-acciones');
+
+        if (!docenteId) {
+            accionesDiv.classList.add('hidden');
+            return;
+        }
+
+        accionesDiv.innerHTML = `
+    <div class="botones-accion">
+      <a href="/reportes/docente/${cicloId}?docente=${docenteId}" class="btn-ver">👁️ Ver Horario</a>
+      <a href="/descargar/pdf/docente/${cicloId}/${docenteId}" class="btn-download btn-pdf" target="_blank">📄 Descargar PDF</a>
     </div>
-  `).join('');
-        container.classList.remove('hidden');
+  `;
+        accionesDiv.classList.remove('hidden');
     }
 
     // ============================================================
