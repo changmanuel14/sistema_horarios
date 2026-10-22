@@ -30,11 +30,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // Utilidad: Generar opciones de hora cada 15 minutos
 // ============================================================
 function llenarSelectsHorario() {
-    const selects = ['cfg-inicio', 'cfg-fin', 'receso-inicio', 'receso-fin'];
+    const selects = [
+        { id: 'cfg-inicio', def: '08:00' },
+        { id: 'cfg-fin', def: '21:00' },
+        { id: 'receso-inicio', def: '12:30' },
+        { id: 'receso-fin', def: '13:30' }
+    ];
 
-    selects.forEach(id => {
-        const select = document.getElementById(id);
-        if (!select) return;
+    selects.forEach(item => {
+        const select = document.getElementById(item.id);
+
+        // Si el elemento no existe, mostramos advertencia y pasamos al siguiente
+        if (!select) {
+            console.warn(`Elemento con id '${item.id}' no encontrado en el DOM.`);
+            return;
+        }
+
         select.innerHTML = '';
 
         for (let h = 6; h <= 22; h++) {
@@ -45,13 +56,10 @@ function llenarSelectsHorario() {
                 select.innerHTML += `<option value="${valor}">${valor}</option>`;
             }
         }
-    });
 
-    // Valores por defecto
-    document.getElementById('cfg-inicio').value = '08:00';
-    document.getElementById('cfg-fin').value = '21:00';
-    document.getElementById('receso-inicio').value = '12:30';
-    document.getElementById('receso-fin').value = '13:30';
+        // Asignar valor por defecto de forma segura (el elemento existe)
+        select.value = item.def;
+    });
 }
 
 // ============================================================
