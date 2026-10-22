@@ -330,6 +330,13 @@ function getBloqueId(dia, hora) {
 // Validación de traslape
 // ============================================================
 async function validarTraslape(docenteId, bloqueId, asignacionId) {
+    // CAMBIO CRÍTICO: Verificar que cicloId exista antes de enviar
+    if (typeof cicloId === 'undefined' || cicloId === null) {
+        console.error("ERROR CRÍTICO: cicloId no está definido en el entorno.");
+        alert("⚠️ Error del sistema: No se puede validar el horario. Por favor, recarga la página.");
+        return false; // Bloquear por seguridad
+    }
+
     const r = await fetch('/api/validar_traslape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -340,6 +347,14 @@ async function validarTraslape(docenteId, bloqueId, asignacionId) {
             ciclo_id: cicloId
         })
     });
+
+    // Si el servidor rechazó por datos incompletos (error 400)
+    if (!r.ok) {
+        const err = await r.json();
+        alert("⚠️ " + (err.error || "Error de validación en el servidor"));
+        return false;
+    }
+
     const j = await r.json();
     if (j.conflicto) {
         alert('⚠️ TRASLAPE: ' + j.mensaje);

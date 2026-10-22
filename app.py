@@ -11,6 +11,7 @@ from flask import send_file
 from openpyxl import load_workbook
 from werkzeug.utils import secure_filename
 import os
+import logging
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -847,21 +848,19 @@ def validar_traslape():
     asignacion_id = d.get('asignacion_id')
     ciclo_id = d.get('ciclo_id')
 
+    # CAMBIO CRÍTICO: Si falta algún dato, RECHAZAR la operación, no permitir
     if not docente_id or not bloque_id or not ciclo_id:
-        return jsonify({'conflicto': False})
+        logging.warning(f"⚠️ INTENTO DE TRASLAPE NO VALIDADO: Datos incompletos. docente={docente_id}, bloque={bloque_id}, ciclo={ciclo_id}")
+        return jsonify({'error': 'Datos incompletos para validar el horario. Recarga la página.'}), 400
 
-    # Obtener el intervalo de tiempo del bloque objetivo
     bloque_target = BloqueHorario.query.get(bloque_id)
     if not bloque_target:
-        return jsonify({'conflicto': False})
+        return jsonify({'error': 'Bloque horario no encontrado'}), 400
 
-    target_inicio_min = bloque_target.hora_inicio.hour * \
-        60 + bloque_target.hora_inicio.minute
+    target_inicio_min = bloque_target.hora_inicio.hour * 60 + bloque_target.hora_inicio.minute
     target_fin_min = bloque_target.hora_fin.hour * 60 + bloque_target.hora_fin.minute
 
-    # ---------------------------------------------------------
     # 1. Verificar restricciones de horario del docente
-    # ---------------------------------------------------------
     restricciones = RestriccionDocente.query.filter_by(
         id_docente=docente_id,
         dia=bloque_target.dia
@@ -881,32 +880,23 @@ def validar_traslape():
                 f"{restriccion.hora_fin.strftime('%H:%M')}."
             })
 
-    # ---------------------------------------------------------
     # 2. Obtener ciclos superpuestos
-    # ---------------------------------------------------------
     ciclos_ids = obtener_ciclos_superpuestos(ciclo_id)
 
-    # ---------------------------------------------------------
     # 3. Verificar traslape con otras asignaciones del docente
-    #    en TODOS los ciclos superpuestos
-    # ---------------------------------------------------------
     asignaciones_docente = db.session.query(Asignacion).join(BloqueHorario).filter(
         Asignacion.id_docente == docente_id,
-        # ← Buscar en todos los ciclos superpuestos
         Asignacion.id_ciclo.in_(ciclos_ids),
         BloqueHorario.dia == bloque_target.dia
     )
 
     if asignacion_id:
-        asignaciones_docente = asignaciones_docente.filter(
-            Asignacion.id != asignacion_id)
+        asignaciones_docente = asignaciones_docente.filter(Asignacion.id != asignacion_id)
 
     for asignacion in asignaciones_docente.all():
         bloque_existente = asignacion.bloque
-        existente_inicio_min = bloque_existente.hora_inicio.hour * \
-            60 + bloque_existente.hora_inicio.minute
-        existente_fin_min = bloque_existente.hora_fin.hour * \
-            60 + bloque_existente.hora_fin.minute
+        existente_inicio_min = bloque_existente.hora_inicio.hour * 60 + bloque_existente.hora_inicio.minute
+        existente_fin_min = bloque_existente.hora_fin.hour * 60 + bloque_existente.hora_fin.minute
 
         if target_inicio_min < existente_fin_min and existente_inicio_min < target_fin_min:
             sec_conflicto = Seccion.query.get(asignacion.id_seccion)
@@ -918,6 +908,7 @@ def validar_traslape():
             traslape_fin = min(target_fin_min, existente_fin_min)
             minutos_traslape = traslape_fin - traslape_inicio
 
+            logging.info(f"✅ TRASLAPE DETECTADO: Docente {docente_id} en {nombre_ciclo}, {nombre_seccion}")
             return jsonify({
                 'conflicto': True,
                 'mensaje': f"El docente ya tiene asignada la clase '{asignacion.curso.nombre}' "
@@ -927,6 +918,7 @@ def validar_traslape():
                 f"Traslape de {minutos_traslape} minutos."
             })
 
+    logging.info(f"✔️ SIN TRASLAPE: Docente {docente_id}, Bloque {bloque_id}, Ciclo {ciclo_id}")
     return jsonify({'conflicto': False})
 
 
@@ -1038,12 +1030,47 @@ def crear_asignacion():
 def actualizar_asignacion(id):
     a = Asignacion.query.get_or_404(id)
     d = request.json
+    
+    cambio_bloque = 'bloque_id' in d and d['bloque_id'] != a.id_bloque
+    cambio_docente = 'docente_id' in d and d['docente_id'] != a.id_docente
+    
+    # Si cambia el bloque o el docente, validar traslape antes de guardar
+    if cambio_bloque or cambio_docente:
+        nuevo_docente = d.get('docente_id', a.id_docente)
+        nuevo_bloque = d.get('bloque_id', a.id_bloque)
+        
+        if nuevo_docente:
+            bloque_target = BloqueHorario.query.get(nuevo_bloque)
+            if bloque_target:
+                ciclos_ids = obtener_ciclos_superpuestos(a.id_ciclo)
+                conflicto = db.session.query(Asignacion).join(BloqueHorario).filter(
+                    Asignacion.id_docente == nuevo_docente,
+                    Asignacion.id_ciclo.in_(ciclos_ids),
+                    BloqueHorario.dia == bloque_target.dia,
+                    Asignacion.id != id
+                ).first()
+                
+                if conflicto:
+                    b_conf = conflicto.bloque
+                    # Verificar traslape de horas
+                    t_inicio = bloque_target.hora_inicio.hour * 60 + bloque_target.hora_inicio.minute
+                    t_fin = bloque_target.hora_fin.hour * 60 + bloque_target.hora_fin.minute
+                    c_inicio = b_conf.hora_inicio.hour * 60 + b_conf.hora_inicio.minute
+                    c_fin = b_conf.hora_fin.hour * 60 + b_conf.hora_fin.minute
+                    
+                    if t_inicio < c_fin and c_inicio < t_fin:
+                        return jsonify({
+                            'error': f"El cambio genera un traslape con '{conflicto.curso.nombre}' "
+                                     f"({b_conf.hora_inicio.strftime('%H:%M')}-{b_conf.hora_fin.strftime('%H:%M')})."
+                        }), 400
+
     if 'bloque_id' in d:
         a.id_bloque = d['bloque_id']
     if 'docente_id' in d:
         a.id_docente = d['docente_id']
     if 'modalidad' in d:
         a.modalidad = d['modalidad']
+    
     db.session.commit()
     return jsonify({'ok': True})
 
