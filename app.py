@@ -1095,41 +1095,34 @@ def propagar_docente(id):
 
     # Obtener IDs de las asignaciones del curso para excluir de la búsqueda de conflictos
     ids_asignaciones_curso = [a.id for a in asignaciones_curso]
-
-    # ---------------------------------------------------------
-    # Obtener ciclos superpuestos
-    # ---------------------------------------------------------
     ciclos_ids = obtener_ciclos_superpuestos(asignacion_base.id_ciclo)
 
     conflictos = []
+    
     for asignacion in asignaciones_curso:
         if asignacion.id == id:
             continue
-
-        # Si ya tiene el mismo docente, no hay nada que hacer
         if asignacion.id_docente == docente_id:
             continue
-
+        
         bloque_objetivo = asignacion.bloque
+        obj_inicio = bloque_objetivo.hora_inicio.hour * 60 + bloque_objetivo.hora_inicio.minute
+        obj_fin = bloque_objetivo.hora_fin.hour * 60 + bloque_objetivo.hora_fin.minute
 
-        # Buscar conflictos EXCLUYENDO las asignaciones del mismo curso
-        # y buscando en TODOS los ciclos superpuestos
-        conflicto = db.session.query(Asignacion).join(BloqueHorario).filter(
+        # 🔴 CAMBIO CRÍTICO: Usar .all() en lugar de .first() para revisar TODAS las clases del docente ese día
+        asignaciones_conflicto = db.session.query(Asignacion).join(BloqueHorario).filter(
             Asignacion.id_docente == docente_id,
-            # ← Buscar en todos los ciclos superpuestos
             Asignacion.id_ciclo.in_(ciclos_ids),
             BloqueHorario.dia == bloque_objetivo.dia,
             Asignacion.id.notin_(ids_asignaciones_curso)
-        ).first()
+        ).all()
 
-        if conflicto:
+        for conflicto in asignaciones_conflicto:
             b_conf = conflicto.bloque
             conf_inicio = b_conf.hora_inicio.hour * 60 + b_conf.hora_inicio.minute
             conf_fin = b_conf.hora_fin.hour * 60 + b_conf.hora_fin.minute
-            obj_inicio = bloque_objetivo.hora_inicio.hour * \
-                60 + bloque_objetivo.hora_inicio.minute
-            obj_fin = bloque_objetivo.hora_fin.hour * 60 + bloque_objetivo.hora_fin.minute
 
+            # Verificar si hay traslape de horas
             if obj_inicio < conf_fin and conf_inicio < obj_fin:
                 ciclo_conflicto = Ciclo.query.get(conflicto.id_ciclo)
                 nombre_ciclo = ciclo_conflicto.nombre if ciclo_conflicto else "otro ciclo"
@@ -1139,6 +1132,7 @@ def propagar_docente(id):
                     'curso_conflicto': conflicto.curso.nombre,
                     'ciclo_conflicto': nombre_ciclo
                 })
+                # No usamos break, queremos detectar TODOS los traslapes para informar al usuario
 
     if conflictos:
         mensaje = "No se puede propagar el docente por los siguientes traslapes:\n"
