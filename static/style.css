@@ -1187,3 +1187,24 @@ table.lista th {
 .reporte-card .select2-container--default .select2-selection--single .select2-selection__placeholder {
     color: #7f8c8d;
 }
+
+/* Buscador en la tabla de docentes */
+.search-container {
+    margin-bottom: 15px;
+}
+
+.search-container input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px 15px;
+    font-size: 14px;
+    border: 1px solid #bdc3c7;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.search-container input:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
