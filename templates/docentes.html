@@ -33,7 +33,7 @@
     <tr>
         <td>{{ d.id }}</td>
         <td>{{ d.grado_academico or '—' }}</td>
-        <td><strong>{{ d.nombres }} {{ d.apellidos }}</strong></td>
+        <td>{{ d.nombres }} {{ d.apellidos }}</td>
         <td>{{ d.correo or '—' }}</td>
         <td>
             <button class="btn-editar-docente" onclick="abrirEditarDocente({{ d.id }})">✏️ Editar</button>
